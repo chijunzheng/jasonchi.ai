@@ -12,11 +12,11 @@ interface HeroCtaButtonsProps {
 
 export function HeroCtaButtons({ onAnalysisComplete }: HeroCtaButtonsProps) {
   const handleDownload = () => {
-    trackEvent('resume_downloaded', { source: 'hero' })
+    trackEvent('resume_downloaded')
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-3">
+    <div className="flex items-center justify-center gap-3">
       <Button asChild className="gradient-button rounded-xl px-6">
         <a href="/resume.pdf" download onClick={handleDownload}>
           <FileDown className="mr-2 h-4 w-4" />
@@ -24,7 +24,7 @@ export function HeroCtaButtons({ onAnalysisComplete }: HeroCtaButtonsProps) {
         </a>
       </Button>
       <JDAnalyzerModal onAnalysisComplete={onAnalysisComplete}>
-        <Button className="gradient-button rounded-xl px-6">
+        <Button variant="outline" className="rounded-xl px-6">
           <FileSearch className="mr-2 h-4 w-4" />
           Analyze a JD
         </Button>
