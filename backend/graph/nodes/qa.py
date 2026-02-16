@@ -406,7 +406,7 @@ async def _evaluate(state: GraphState, retrieval: RetrievalResult) -> dict:
 
     prompt = EVALUATE_PROMPT.format(
         question=last_msg,
-        context=retrieval.content[:3000],
+        context=retrieval.content[:6000],
         sources=", ".join(retrieval.sources),
     )
 

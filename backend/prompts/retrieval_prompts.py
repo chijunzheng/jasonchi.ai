@@ -77,6 +77,8 @@ Guidelines:
 - score >= 0.6: Context contains enough relevant information to answer well
 - score 0.3-0.6: Partial information, could benefit from more context
 - score < 0.3: Insufficient, need a different retrieval approach
+- IMPORTANT: If the context mentions the topic AT ALL — even partially or in a different framing — score >= 0.5. The answer generator can synthesize partial information. Only score < 0.3 if the context is completely irrelevant to the question.
+- Topics may span multiple sections (e.g., a tool mentioned in work experience AND skills). Partial coverage from one section still counts.
 
 Return ONLY the JSON object.
 """

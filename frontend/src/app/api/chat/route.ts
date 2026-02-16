@@ -94,22 +94,11 @@ export async function POST(request: NextRequest) {
       ? getContentForPrompt(category as ContentCategory)
       : getAllContentForPrompt()
 
-    let systemPrompt = buildSystemPrompt(
+    const systemPrompt = buildSystemPrompt(
       resumeContent,
       category as ContentCategory | undefined,
+      jobDescription,
     )
-
-    // Inject JD context when available
-    if (jobDescription) {
-      systemPrompt += `\n\n## Active Job Description
-The visitor shared a job description they're evaluating you for.
-Tailor your answers to highlight relevant experience for this role.
-Reference specific JD requirements when applicable.
-Don't repeat the full JD — just weave relevance into your answers naturally.
-
-Job Description:
-${jobDescription}`
-    }
 
     // Prepare messages for Gemini
     const messages = [
