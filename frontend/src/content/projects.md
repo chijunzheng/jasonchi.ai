@@ -197,106 +197,91 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 
 ---
 
-## ORAN RAG Pet Project — Architecture Deep-Dive
+## Telus AI Agent — From Pet Project to Production Agentic RAG
 
 ### The Situation — why I built it
-- Daily pain point: hours searching through thousands of pages of 3GPP/ORAN specifications for answers that should be instantly queryable
+- Daily pain point as a RAN engineer: hours searching through thousands of pages of 3GPP/ORAN specifications for answers that should be instantly queryable
 - No existing tool handled the technical density and cross-reference nature of telecom specs — generic search returned noise
 - Opportunity to learn AI/ML by solving a real problem rather than following tutorials
-- Built entirely on personal time while working full-time as a RAN engineer
+- What started as an unsanctioned side project built on personal time evolved through three distinct phases — pet project, lab optimization, and production deployment — ultimately serving 400+ engineers across 12 teams
 
 ### What I Did
 
-#### RAG Pipeline Architecture Choices
+#### Phase 1: Pet Project RAG (Solo, Personal Time)
+- Built initial RAG system using FastAPI, Google GenAI API, and Vertex AI Vector Search to answer technical RAN questions
 - Document ingestion: PyPDF for PDFs + python-docx for Word specs — multi-format parsing handles the heterogeneous spec ecosystem
 - Chunking strategy: experimented with fixed-size (512 tokens), paragraph-level, and section-based approaches — section-based won because 3GPP specs have rigid, self-contained section structures that break poorly at arbitrary boundaries
-- Embedding: Vertex AI text-embedding for vector representations — chose managed service over self-hosted for zero-ops overhead
-- Vector store: Vertex AI Vector Search with tunable recall/precision trade-offs (distance measure, neighbor count, leaf node search fraction)
+- Vertex AI Vector Search over Pinecone/Weaviate: native GCP integration meant fewer moving parts, and tunable parameters (distance measure, neighbor count, leaf node search fraction) let me optimize for telecom-specific retrieval patterns
+- Streamlit frontend: built a functional demo UI in 2 days — intentional trade-off of polish for speed, since the goal was demonstrating RAG quality to leadership
+- Adopted the [ORAN benchmark](https://arxiv.org/pdf/2407.06245) as an external evaluation standard — avoids overfitting to self-created test sets
+- **Result: 78% benchmark accuracy vs. 62% raw LLM baseline — demo to a Telus Fellow earned a full-time AI engineering mandate**
 
-#### Technology Stack Decisions
-- FastAPI over Flask/Django: async Python for non-blocking LLM calls, automatic OpenAPI docs for easy handoff, Pydantic validation for type-safe request/response handling
-- Streamlit for the frontend: built a functional demo UI in 2 days — intentional trade-off of polish for speed, since the goal was demonstrating RAG quality to leadership, not shipping a production frontend
-- Vertex AI Vector Search over Pinecone/Weaviate: native GCP integration meant fewer moving parts, and tunable parameters let me optimize for telecom-specific retrieval patterns
+#### Phase 2: Lab Ablation Studies (Single H100 GPU)
+- Goal: systematic ablation study isolating the contribution of each improvement technique to push accuracy higher and secure executive buy-in
 
-#### Benchmarking & Iterative Improvement
-- Adopted the ORAN benchmark (arxiv.org/pdf/2407.06245) as an external evaluation standard — avoids overfitting to self-created test sets
-- Baseline measurement: raw LLM scored 62% on the benchmark without retrieval augmentation
-- After RAG implementation: 78% accuracy — a 16-percentage-point improvement over raw LLM
-- Tracked accuracy per question category (architecture, protocol, configuration) to identify retrieval weak spots and target improvements
+##### LLM Continual Pre-Training
+- Fine-tuned Qwen-3-8B via continual pre-training on curated 3GPP/ORAN triplets (subject, relation, object) — e.g., (gNB-DU, connects-to, gNB-CU via F1 interface)
+- 8-bit quantization freed enough VRAM for batch size 4 on a single H100 — ~2 weeks wall-clock time with checkpoint evaluation every 500 steps
+- Result: **+2% accuracy** — smallest individual gain, but checkpoint-level analysis revealed which telecom sub-domains benefited most
 
-### The Result
-- 78% ORAN benchmark accuracy vs. 62% raw LLM baseline — 26% relative improvement
-- Built entirely in spare time while working full-time as a RAN engineer
-- Architecture and learnings became the foundation for the production system at Telus
-- Demo to a Telus Fellow earned a full-time AI engineering mandate
-
-### Real Talk
-- Streamlit was perfect for internal demos but would not scale for production — intentional trade-off for speed over polish
-- Section-based chunking for telecom specs was a domain insight: generic chunking strategies (fixed-size, paragraph) performed poorly because 3GPP sections are designed as self-contained reference units
-- The 78% score convinced leadership, but showing which question categories the system got right vs. wrong mattered more than the aggregate number — category-level analysis built trust
-- This project taught me that solving your own pain point produces the best demos — authenticity is obvious to evaluators
-
-### Tech I Used
-- **Backend:** Python, FastAPI, Uvicorn, Pydantic
-- **AI/ML:** Google GenAI API, Vertex AI Vector Search, text-embedding
-- **Data:** PyPDF, python-docx, NumPy
-- **Frontend:** Streamlit
-- **Tools:** Jupyter Notebook, Git
-
----
-
-## LLM & Embedding Fine-Tuning — Ablation Study
-
-### The Situation — why I built it
-- Pet project RAG hit 78% on ORAN benchmark — needed to push higher to secure executive buy-in for a production mandate
-- Hypothesis: domain-specific fine-tuning could close the gap between generic models and telecom-specific expertise
-- Had access to a single H100 GPU in Telus lab — enough for 8-bit quantized training but not full-precision large models
-- Goal: systematic ablation study isolating the contribution of each improvement technique
-
-### What I Did
-
-#### Dataset Curation for LLM Fine-Tuning
-- Extracted knowledge triplets (subject, relation, object) from 3GPP/ORAN specifications — e.g., (gNB-DU, connects-to, gNB-CU via F1 interface)
-- Curated training data focused on factual relationships between telecom concepts rather than bulk text
-- Quality over quantity: small, high-signal dataset targeting the specific knowledge gaps identified in category-level benchmark analysis
-- Triplet format chosen because telecom specs are fundamentally about entity relationships and protocol interactions
-
-#### LLM Continual Pre-Training on H100
-- Chose Qwen-3-8B for its strong multilingual baseline and permissive license — smaller models (1-3B) lacked capacity for telecom domain complexity, larger models (70B+) exceeded single-GPU budget
-- 8-bit quantization freed enough VRAM for batch size 4 on a single H100 — critical for stable gradient updates on small domain-specific datasets
-- Training configuration: learning rate warmup (10% of steps) with cosine decay, ~2 weeks wall-clock time with checkpoint evaluation every 500 steps
-- Result: +2% accuracy — smallest individual gain, but the checkpoint-level analysis revealed which telecom sub-domains benefited most from continual pre-training
-
-#### Embedding Model Fine-Tuning with Contrastive Learning
+##### Embedding Fine-Tuning
 - Curated triplets: query + positive chunk (correct answer source) + negative chunk (plausible but incorrect)
 - Contrastive learning objective: push domain-relevant query-chunk pairs closer in embedding space while separating negatives
-- Improved retrieval precision for telecom-specific terminology that generic embeddings mapped poorly
-- Result: +3% accuracy — better ROI than LLM fine-tuning for a fraction of the compute cost
+- Result: **+3% accuracy** — better ROI than LLM fine-tuning for a fraction of the compute cost
 
-#### Retrieval Optimization — Hybrid Search & Contextual Chunking
-- Hybrid retrieval: fused semantic similarity scores with BM25 lexical scores using reciprocal rank fusion — telecom acronyms (gNB-DU, E2SM) need exact match, but conceptual queries need semantic understanding — +5% accuracy
-- Contextual chunking: prepended a Gemini-generated document summary to each chunk before embedding — gives the retriever document-level awareness at chunk-level granularity — +5% accuracy
+##### Retrieval Optimization
+- Hybrid retrieval: fused semantic similarity scores with BM25 lexical scores using reciprocal rank fusion — telecom acronyms (gNB-DU, E2SM) need exact match, but conceptual queries need semantic understanding — **+5% accuracy**
+- Contextual chunking: prepended a Gemini-generated document summary to each chunk before embedding — gives the retriever document-level awareness at chunk-level granularity — **+5% accuracy**
 - These retrieval-side improvements delivered 2-5x the ROI of model fine-tuning in a fraction of the time
-- Key insight: for RAG systems, retrieval quality improvements compound — better chunks → better generation → fewer hallucinations
 
-### The Result
-- 88% total ORAN benchmark accuracy — up from 78% naive RAG and 62% raw LLM baseline
+- **Result: 88% benchmark accuracy (26 points above raw LLM, 10 above naive RAG). Presented to CTO, VP, and Director — systematic ablation evidence secured the production mandate**
+
+#### Phase 3: Production Deployment on GCP (Team of 5)
+- Chose GCP for its AI capabilities and natural fit with Telus's Google Workspace workflows (Google Chat as primary interface)
+- Google's managed RAG solution performed well in US region demo but was unusable in the Canadian region required by Telus data sovereignty policy — pivoted to building custom system with lower-level Google APIs
+- Built custom RAG pre-processing pipeline, Vertex AI Vector Search as vector database, and multi-agent orchestration via Google ADK (Agent Development Kit)
+
+##### Multi-Agent System & Memory
+- Google ADK for multi-agent orchestration — selected for built-in tool use, memory management, and seamless Google GenAI API integration
+- **Short-term memory:** ADK's native database session service storing conversation history, events, and tool calls in Cloud SQL
+- **Long-term memory:** Firestore vector database for semantic retrieval of past context; Cloud SQL for structured metadata queries
+- Context compacted via LLM summarization at 50% context window threshold — empirically tested as the optimal point before answer quality degrades
+
+##### Frontend via Google Chat
+- Google Chat bot integrated with backend API via Apps Script — all Telus employees already had access, zero adoption friction
+- Custom cards display agent reasoning: retrieved chunks, tool calls, agent decisions — providing transparency into how answers are generated
+- Thumbs up/down buttons with optional text feedback stored in Cloud SQL for continuous improvement loop
+
+##### Observability & 4-Dimension Evaluation
+- Deployed Langfuse on a dedicated Cloud Run container for end-to-end tracing of every query
+- Built automated evaluation pipeline: **Fact judge** (golden dataset by domain experts), **Retrieval judge** (LLM-generated query/chunk pairs), **Tool-call judge** (domain expert query/expected tool-call pairs), **Performance judge** (latency and cost vs. SLA)
+- Evaluation runs automatically on every Cloud Run deployment, with reports diffable against previous versions
+
+- **Result: Production agentic RAG launched end of 2025, serving 400+ engineers across 12 teams. Reduced spec search time from 2 hours to 20 minutes per query. User dissatisfaction improved from 50% to 30% after 3 months of feedback-driven iteration**
+
+### The Result (Full Journey)
+- Accuracy progression: 62% (raw LLM) → 78% (naive RAG) → 88% (optimized) — a 42% relative improvement
+- Project arc: unsanctioned solo side project → lab ablation study → company-backed production system in under 2 years
 - Ablation breakdown: hybrid retrieval (+5%) > contextual chunking (+5%) > embedding fine-tuning (+3%) > LLM continual pre-training (+2%)
 - Key finding: retrieval quality improvements outperformed generator improvements by 2-5x on ROI
-- Results presented to CTO, VP, and Director — systematic ablation evidence secured the production mandate
+- Led and upskilled 4 junior engineers from zero AI experience to independently owning production system components
+- 4-dimension automated eval pipeline catches regressions on every deployment before they reach users
+- Presented to CTO, VP, and Director at each phase — built executive trust through evidence, not promises
 
 ### Real Talk
-- LLM fine-tuning had the worst ROI: 2 weeks of H100 compute for +2% vs. days of engineering for +5% from hybrid search. This shaped our team's prioritization framework: always benchmark retrieval-side changes first
-- 8-bit quantization was a necessary constraint but introduced subtle quality trade-offs — full precision would likely have yielded +3-4% instead of +2%
-- The ablation methodology (isolating each improvement independently) was more valuable than any single technique — it built evidence-based decision making into the team's approach
-- If repeating this: start with retrieval optimization, only fine-tune models after retrieval improvements plateau
+- **Solving your own pain point produces the best demos.** This started because *I* was frustrated searching specs. That authenticity was obvious to evaluators — the demo wasn't hypothetical, it was me showing how I already used it daily
+- **Section-based chunking was a domain insight.** Generic chunking strategies (fixed-size, paragraph) performed poorly because 3GPP sections are designed as self-contained reference units. Domain knowledge applied to retrieval architecture matters more than fancier models
+- **Fine-tuning the LLM gave the smallest ROI.** Two weeks training Qwen-3-8B on an H100 for +2% vs. days of engineering for +5% from hybrid search. Lesson: for most RAG systems, exhaust retrieval-side improvements before touching model weights
+- **Don't trust vendor promises blindly.** Google's managed RAG worked great in the US region demo but fell apart in the Canadian region we needed. Should have demanded a Canadian-region proof of concept before committing
+- **The ablation methodology was more valuable than any single technique.** Isolating each improvement independently built evidence-based decision making into the team's approach — and gave executives confidence in continued investment
+- **Observability should be day-one, not an afterthought.** We bolted on Langfuse after hitting production issues. If tracing had been there from the start, we'd have caught the context window degradation problem much earlier
+- **Leading juniors slowed me down at first, but 10x'd the outcome.** My instinct was to build everything myself. But investing in the team meant we could parallelize pipeline, evaluation, and frontend work. The 4 engineers I mentored now own AI system components independently
 
 ### Tech I Used
-- **Training:** PyTorch, Qwen-3-8B, H100 GPU, 8-bit quantization
-- **Retrieval:** Rank-BM25, Vertex AI Vector Search, text-embedding
-- **Evaluation:** ORAN benchmark (arxiv.org/pdf/2407.06245), per-category accuracy tracking
-- **Data:** 3GPP/ORAN specifications, curated triplet datasets
-- **Tools:** Jupyter Notebook, NumPy, Pandas
+- **Phase 1:** Python, FastAPI, Uvicorn, Pydantic, Streamlit, Google GenAI API, Vertex AI Vector Search, PyPDF, python-docx
+- **Phase 2:** PyTorch, Qwen-3-8B, H100 GPU, 8-bit quantization, Rank-BM25, contrastive learning, ORAN benchmark
+- **Phase 3:** Google ADK, Cloud Run, Cloud Build, Cloud SQL (MySQL), Firestore, Cloud Storage, Cloud Tasks, Google Chat, Apps Script, Langfuse, OpenTelemetry
+- **Tools:** Docker, Git, GitHub, GitLab, uv, Jupyter Notebook, Claude Code
 
 ---
 

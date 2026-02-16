@@ -60,6 +60,8 @@ order: 1
 - Training bridged the gap between AI engineering and domain expertise: once colleagues understood how retrieval and generation worked, they could contribute higher-quality data annotations, flag retrieval failures more precisely, and participate meaningfully in evaluation design
 - Ran ongoing AI tooling training that evolved with the landscape: started with Gemini and NotebookLM for document Q&A, progressed to Cursor for AI-assisted coding, and most recently onboarded teams onto CLI-based coding agents like Claude Code
 - Focused on practical, workflow-specific use cases rather than generic demos — e.g., using NotebookLM to digest 3GPP specs, Cursor to scaffold test suites, Claude Code to automate repetitive refactoring
+- Trained the 4 junior engineers on AI-assisted development workflows — taught them how to use Cursor effectively (prompt crafting, codebase context, iterative refinement), then migrated the team to Claude Code with structured agent skills. This directly accelerated their ramp-up: juniors who would normally need months of onboarding were contributing production code within weeks because AI tools handled the boilerplate while they focused on domain-specific logic
+- Extended training beyond the immediate team to broader engineering colleagues — ran lunch-and-learn sessions and 1:1 coaching for engineers curious about integrating AI tools into their own workflows, regardless of whether they were on the AI project
 - Measurably improved team productivity: engineers who adopted the tools reported spending less time on boilerplate tasks and more time on design and problem-solving
 
 #### AI-Assisted Development as a Force Multiplier
