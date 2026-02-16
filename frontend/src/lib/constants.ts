@@ -50,5 +50,5 @@ export const CONTENT_CATEGORIES = [
 export const CHAT_CONFIG = {
   maxMessages: 50,
   streamingEnabled: true,
-  model: 'gemini-2.0-flash',
+  model: 'gemini-3-flash-preview',
 } as const

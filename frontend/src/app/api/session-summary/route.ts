@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       .join('\n\n')
 
     const client = new GoogleGenerativeAI(apiKey)
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const result = await model.generateContent(
       `${SUMMARY_PROMPT}\n\n=== CONVERSATION ===\n${conversationText}\n\nReturn ONLY the JSON object.`,

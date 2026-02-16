@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     const client = new GoogleGenerativeAI(apiKey)
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const prompt = `${ANALYZE_PROMPT}
 

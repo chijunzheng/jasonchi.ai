@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     content_dir: Path = Path(__file__).resolve().parent.parent / "frontend" / "src" / "content"
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = "gemini-3-flash-preview"
     embedding_model: str = "models/gemini-embedding-001"
     max_history_messages: int = 10
     rate_limit_rpm: int = 20

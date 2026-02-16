@@ -23,7 +23,7 @@ export async function* streamChat(
 ): AsyncGenerator<string> {
   const client = createClient()
   const model = client.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
     systemInstruction: systemPrompt,
   })
 
@@ -54,7 +54,7 @@ export async function generateFollowUps(
 ): Promise<string[]> {
   try {
     const client = createClient()
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const result = await model.generateContent(prompt)
     const text = result.response.text().trim()
