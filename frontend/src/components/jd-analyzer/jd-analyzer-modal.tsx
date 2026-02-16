@@ -14,14 +14,13 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import type { JDAnalysis } from '@/types/jd-analysis'
 import { AnalysisResults } from './analysis-results'
-import { CoverLetterOutput } from './cover-letter-output'
 
 interface JDAnalyzerModalProps {
   readonly children: React.ReactNode
   readonly onAnalysisComplete?: (jobDescription: string, analysis: JDAnalysis) => void
 }
 
-type ModalState = 'input' | 'analyzing' | 'results' | 'cover-letter' | 'error'
+type ModalState = 'input' | 'analyzing' | 'results' | 'error'
 
 export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModalProps) {
   const [open, setOpen] = useState(false)
@@ -53,23 +52,12 @@ export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModa
       }
 
       const data = await response.json()
-
-      if (onAnalysisComplete) {
-        onAnalysisComplete(jdText, data)
-        handleReset()
-        setOpen(false)
-      } else {
-        setAnalysis(data)
-        setState('results')
-      }
+      setAnalysis(data)
+      setState('results')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setState('error')
     }
-  }
-
-  const handleGenerateCoverLetter = () => {
-    setState('cover-letter')
   }
 
   const handleDiscussInChat = () => {
@@ -93,15 +81,12 @@ export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModa
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
-            {state === 'cover-letter' ? 'Cover Letter' : 'JD Analyzer'}
-          </DialogTitle>
+          <DialogTitle>JD Analyzer</DialogTitle>
           <DialogDescription>
             {state === 'input' &&
               'Paste a job description to see how well it matches'}
             {state === 'analyzing' && 'Analyzing your match...'}
             {state === 'results' && 'Here\'s your match analysis'}
-            {state === 'cover-letter' && 'Tailored to the job description'}
             {state === 'error' && 'Something went wrong'}
           </DialogDescription>
         </DialogHeader>
@@ -135,16 +120,7 @@ export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModa
         {state === 'results' && analysis && (
           <AnalysisResults
             analysis={analysis}
-            onGenerateCoverLetter={handleGenerateCoverLetter}
             onDiscussInChat={handleDiscussInChat}
-          />
-        )}
-
-        {state === 'cover-letter' && analysis && (
-          <CoverLetterOutput
-            jobDescription={jdText}
-            analysis={analysis}
-            onBack={() => setState('results')}
           />
         )}
       </DialogContent>

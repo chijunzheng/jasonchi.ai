@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Check, Copy, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,8 +23,9 @@ export function CoverLetterOutput({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyToClipboard()
+  const controllerRef = useRef<AbortController | null>(null)
 
-  const generate = useCallback(async () => {
+  const generate = useCallback(async (signal: AbortSignal) => {
     setIsLoading(true)
     setContent('')
     setError(null)
@@ -37,7 +38,8 @@ export function CoverLetterOutput({
           gaps: [...analysis.gaps],
           angle: analysis.angle,
         },
-      })) {
+      }, signal)) {
+        if (signal.aborted) return
         switch (event.type) {
           case 'text':
             setContent((prev) => prev + (event.content as string))
@@ -49,14 +51,25 @@ export function CoverLetterOutput({
         }
       }
     } catch (err) {
+      if (signal.aborted) return
       setError(err instanceof Error ? err.message : 'Failed to generate')
     } finally {
-      setIsLoading(false)
+      if (!signal.aborted) setIsLoading(false)
     }
   }, [jobDescription, analysis])
 
   useEffect(() => {
-    generate()
+    const controller = new AbortController()
+    controllerRef.current = controller
+    generate(controller.signal)
+    return () => controller.abort()
+  }, [generate])
+
+  const handleRetry = useCallback(() => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
+    generate(controller.signal)
   }, [generate])
 
   const handleDownload = () => {
@@ -88,7 +101,7 @@ export function CoverLetterOutput({
       {error && (
         <div className="space-y-2">
           <p className="text-sm text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={generate}>
+          <Button variant="outline" size="sm" onClick={handleRetry}>
             Try Again
           </Button>
         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { Lightbulb, MessageSquare, FileText } from 'lucide-react'
+import { Lightbulb, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -11,13 +11,11 @@ import { GapsList } from './gaps-list'
 
 interface AnalysisResultsProps {
   readonly analysis: JDAnalysis
-  readonly onGenerateCoverLetter: () => void
   readonly onDiscussInChat: () => void
 }
 
 export function AnalysisResults({
   analysis,
-  onGenerateCoverLetter,
   onDiscussInChat,
 }: AnalysisResultsProps) {
   return (
@@ -62,21 +60,11 @@ export function AnalysisResults({
 
       <Separator />
 
-      {/* CTAs */}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button onClick={onGenerateCoverLetter} className="flex-1">
-          <FileText className="mr-2 h-4 w-4" />
-          Generate Cover Letter
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onDiscussInChat}
-          className="flex-1"
-        >
-          <MessageSquare className="mr-2 h-4 w-4" />
-          Discuss in Chat
-        </Button>
-      </div>
+      {/* CTA */}
+      <Button onClick={onDiscussInChat} className="w-full">
+        <MessageSquare className="mr-2 h-4 w-4" />
+        Discuss in Chat
+      </Button>
     </div>
   )
 }
