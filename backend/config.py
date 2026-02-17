@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # Cap context size for category fast-path answers to reduce prompt tokens/latency.
     # Set <= 0 to disable truncation.
     fast_path_max_context_chars: int = 7000
+    # Skip the evaluate step in reflective pipeline (saves 1 LLM call + corrective retrieval).
+    # When True, retrieved context goes straight to answer generation without quality scoring.
+    skip_evaluation: bool = True
     # Generate follow-up questions via LLM (adds ~3-4s latency per response).
     generate_followups_with_llm: bool = True
     # Prewarm content index on startup in a background task.

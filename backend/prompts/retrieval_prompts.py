@@ -48,9 +48,14 @@ Guidelines:
 - confidence > 0.7: Simple greetings, meta questions about the site, questions answerable from summaries alone
 - confidence 0.4-0.7: Questions that need some specific details but topic is clear
 - confidence < 0.4: Questions requiring specific facts, numbers, or cross-category synthesis
-- quick_scan: Simple factual questions about a clear topic
-- deep_retrieve: Questions about specific experiences, skills, or achievements
-- full_context: Broad questions, cover letters, or questions needing the complete picture
+- quick_scan: Simple factual questions about a clear topic (e.g., "What tools do you use?")
+- deep_retrieve: Questions about specific, narrow experiences or achievements (e.g., "What was the benchmark accuracy?")
+- full_context: Use this for ANY of the following:
+  - Narrative or journey questions ("How did X lead to Y?", "Tell me about your path to...")
+  - Questions spanning multiple topics or phases of a project
+  - Questions about career transitions, motivation, or decision-making
+  - Broad questions, cover letters, or questions needing the complete picture
+  When in doubt between deep_retrieve and full_context, prefer full_context — it is more reliable for resume content.
 
 Return ONLY the JSON object.
 """
@@ -79,6 +84,7 @@ Guidelines:
 - score < 0.3: Insufficient, need a different retrieval approach
 - IMPORTANT: If the context mentions the topic AT ALL — even partially or in a different framing — score >= 0.5. The answer generator can synthesize partial information. Only score < 0.3 if the context is completely irrelevant to the question.
 - Topics may span multiple sections (e.g., a tool mentioned in work experience AND skills). Partial coverage from one section still counts.
+- If score < 0.6, ALWAYS include alternative_categories. Suggest ["work-experience", "projects"] as alternatives for career/narrative questions, or the most relevant categories for the topic.
 
 Return ONLY the JSON object.
 """

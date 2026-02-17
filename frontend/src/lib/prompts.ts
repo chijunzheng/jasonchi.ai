@@ -94,7 +94,11 @@ If there are JD requirements with no matching experience, add:
 **Gaps to Address**
 Honestly acknowledge 1-2 areas where my experience doesn't directly match, and briefly note transferable skills that could bridge the gap.`,
 
-  projects: `A job description has been shared. When discussing projects, highlight aspects most relevant to the JD requirements. For each project, explicitly note which skills or experiences demonstrated by the project map to specific JD requirements. ONLY reference projects from the Resume Content — never invent projects.`,
+  projects: `A job description has been shared. When discussing projects, highlight aspects most relevant to the JD requirements. For each project, explicitly note which skills or experiences demonstrated by the project map to specific JD requirements. ONLY reference projects from the Resume Content — never invent projects.
+
+Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). Do not omit Cortex in general project answers; include it at least briefly and map it to relevant JD themes when applicable.
+
+IMPORTANT: The Telus AI Agent is a multi-phase project (pet project → lab ablation → production). Cover ALL phases — especially Phase 3 (production deployment with Google ADK, multi-agent orchestration, 400+ engineers). The production phase is often the most relevant to JD requirements.`,
 
   skills: `A job description has been shared. When discussing skills, prioritize skills that match JD requirements. Group them by relevance: skills that directly match JD requirements first, then adjacent/transferable skills. Note depth of experience with each. ONLY reference skills from the Resume Content — never invent skills or proficiencies.`,
 }
@@ -113,8 +117,15 @@ For the AI Engineer role, tell the origin story: I was a RAN engineer who self-t
 For the RAN Engineer role, keep it concise (3-4 bullets) but highlight the O-RAN achievement and how it set up the pivot to AI.
 
 After both roles, close with 1-2 sentences on what ties them together: domain expertise in telecom + self-driven pivot to AI engineering.`,
-  projects:
-    'Focus on side projects and personal builds. For each project, explain the motivation (why I built it), the key technical decisions I made and why, and the measurable outcomes. Highlight what each project demonstrates about my engineering approach. Cover the top 3 projects in detail.',
+  projects: `Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). For each project, explain the motivation (why I built it), the key technical decisions I made and why, and the measurable outcomes.
+
+For the Telus AI Agent project, this is a MULTI-PHASE project — cover ALL phases:
+- Phase 1 (Pet Project): solo build, 78% benchmark, demo to Telus Fellow
+- Phase 2 (Lab Ablation): systematic technique comparison on H100, pushed to 88%
+- Phase 3 (Production): Google ADK multi-agent system, Google Chat frontend, Langfuse observability, 4-dimension eval, 400+ engineers across 12 teams
+Tell the full arc — this is the most compelling project because it shows initiative, technical depth, leadership, and production impact.
+
+For ShowMe, jasonchi.ai, and Cortex, explain the motivation, key technical decisions, and outcomes. Highlight what each demonstrates about my engineering approach. If asked generally about projects, always include Cortex at least briefly.`,
   skills:
     'Focus on technical skills, proficiencies, and tools. Group by domain (AI/ML, Cloud, Languages). Be specific about depth — distinguish between skills I use daily in production vs. ones I have working knowledge of. Mention which projects or roles I used each skill in.',
   education:

@@ -35,6 +35,7 @@ from prompts.templates import (
     FOLLOW_UP_PROMPT,
     JD_CONTEXT_SECTION,
     SYSTEM_PROMPT,
+    get_category_instruction,
 )
 
 _SMALL_RESUME_THRESHOLD_CHARS = 8_000
@@ -43,6 +44,59 @@ _DEFAULT_FOLLOW_UPS = [
     "What was the biggest challenge?",
     "How did that impact the team?",
 ]
+
+
+def _balanced_projects_context(content: str, max_chars: int) -> str:
+    """Keep representative project coverage under truncation budget."""
+    truncation_note = "\n\n[Context truncated for latency.]"
+
+    def _with_note(text: str) -> str:
+        cutoff = max(0, max_chars - len(truncation_note))
+        return text[:cutoff].rstrip() + truncation_note
+
+    if max_chars <= 0 or len(content) <= max_chars:
+        return content
+
+    matches = list(re.finditer(r"(?m)^##\s+", content))
+    if not matches:
+        return _with_note(content)
+
+    sections: list[tuple[str, str]] = []
+    for i, match in enumerate(matches):
+        start = match.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+        block = content[start:end].strip()
+        title = block.splitlines()[0].lower() if block else ""
+        sections.append((title, block))
+
+    priorities = ["telus ai agent", "showme", "jasonchi.ai", "cortex"]
+    selected: list[str] = []
+    for key in priorities:
+        for title, block in sections:
+            if key in title and block not in selected:
+                selected.append(block)
+                break
+
+    if not selected:
+        return _with_note(content)
+
+    separator = "\n\n---\n\n"
+    available = max_chars - (len(separator) * (len(selected) - 1))
+    if available <= 0:
+        return _with_note(content)
+
+    per_section = max(500, available // len(selected))
+    parts: list[str] = []
+    for block in selected:
+        if len(block) <= per_section:
+            parts.append(block)
+        else:
+            parts.append(block[:per_section].rstrip() + "\n\n[Section truncated for latency.]")
+
+    merged = separator.join(parts)
+    if len(merged) > max_chars:
+        merged = _with_note(merged)
+    return merged
 
 
 def _strip_json_blocks(text: str) -> str:
@@ -116,21 +170,32 @@ async def _fast_path(state: GraphState) -> dict:
 
     index = await get_content_index()
     resume_content = index.get_full_category(state.category)
+    original_len = len(resume_content)
     max_chars = int(getattr(settings, "fast_path_max_context_chars", 0) or 0)
     if max_chars > 0 and len(resume_content) > max_chars:
-        logger.info(
-            "Fast path context capped: category=%s chars=%d->%d",
-            state.category,
-            len(resume_content),
-            max_chars,
-        )
-        resume_content = (
-            resume_content[:max_chars].rstrip()
-            + "\n\n[Context truncated for latency. Ask for a specific topic for deeper detail.]"
-        )
-    category_instruction = CATEGORY_INSTRUCTIONS.get(
+        if state.category == "projects":
+            resume_content = _balanced_projects_context(resume_content, max_chars)
+            logger.info(
+                "Fast path project context balanced: category=%s chars=%d->%d",
+                state.category,
+                original_len,
+                len(resume_content),
+            )
+        else:
+            logger.info(
+                "Fast path context capped: category=%s chars=%d->%d",
+                state.category,
+                original_len,
+                max_chars,
+            )
+            resume_content = (
+                resume_content[:max_chars].rstrip()
+                + "\n\n[Context truncated for latency. Ask for a specific topic for deeper detail.]"
+            )
+
+    category_instruction = get_category_instruction(
         state.category,
-        "Answer based on all available resume content.",
+        state.job_description,
     )
 
     # Generate answer
@@ -253,13 +318,26 @@ async def _reflective_path(state: GraphState) -> dict:
 
     # Phase C: Evaluate + Answer
     eval_start = time.perf_counter()
-    eval_result = await _evaluate(state, retrieval)
-    total_tokens += eval_result["tokens"]
 
-    logger.info(
-        "Evaluate complete: sufficiency=%.2f, suggestion=%s",
-        eval_result["sufficiency"], eval_result.get("suggestion"),
-    )
+    # When skip_evaluation is enabled, bypass the evaluate LLM call and corrective
+    # re-retrieval entirely — go straight to answer generation with retrieved context.
+    if settings.skip_evaluation:
+        logger.info("Evaluate skipped (skip_evaluation=True)")
+        eval_result = {
+            "sufficiency": 1.0,
+            "reasoning": "Evaluation skipped — skip_evaluation enabled",
+            "suggestion": "sufficient",
+            "alternatives": [],
+            "tokens": 0,
+        }
+    else:
+        eval_result = await _evaluate(state, retrieval)
+        total_tokens += eval_result["tokens"]
+
+        logger.info(
+            "Evaluate complete: sufficiency=%.2f, suggestion=%s",
+            eval_result["sufficiency"], eval_result.get("suggestion"),
+        )
 
     # Corrective re-retrieval if quality too low (max 1 retry)
     if eval_result["sufficiency"] < 0.6 and eval_result.get("alternatives"):
@@ -296,6 +374,32 @@ async def _reflective_path(state: GraphState) -> dict:
         state, retrieval.content, "Answer based on the retrieved context.",
     )
     total_tokens += answer_tokens
+
+    # Safety net: if the answer contains the "not covered" fallback, the retrieval
+    # missed relevant content. Retry once with full context from all categories.
+    _NOT_COVERED_MARKER = "not something covered in my resume"
+    if _NOT_COVERED_MARKER in answer_text.lower():
+        logger.warning("Safety net triggered: answer contained fallback phrase, retrying with full context")
+        safety_start = time.perf_counter()
+        index = await get_content_index()
+        full_resume = index.get_full_category(CATEGORIES)
+        answer_text, safety_tokens = await _generate_answer(
+            state, full_resume, "Answer based on all available resume content.",
+        )
+        total_tokens += safety_tokens
+        safety_latency = (time.perf_counter() - safety_start) * 1000
+
+        trace_steps.append(TraceStep(
+            node="safety_net",
+            reasoning="Initial answer triggered 'not covered' fallback — retried with full resume content",
+            tool_calls=[f"full_context({list(CATEGORIES)})"],
+            latency_ms=safety_latency,
+            tokens_used=safety_tokens,
+            retrieval_method="full_context",
+            sources_used=list(CATEGORIES),
+            quality_check="safety net: full context retry",
+        ))
+
     follow_ups = await _generate_follow_ups(answer_text)
 
     eval_latency = (time.perf_counter() - eval_start) * 1000

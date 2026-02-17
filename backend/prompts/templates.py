@@ -61,10 +61,19 @@ CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "telecom + self-driven pivot to AI engineering."
     ),
     "projects": (
-        "Focus on side projects and personal builds. For each project, explain the motivation "
-        "(why I built it), the key technical decisions I made and why, and the measurable outcomes. "
-        "Highlight what each project demonstrates about my engineering approach. Cover the top 3 "
-        "projects in detail."
+        "Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). "
+        "For each project, explain the motivation (why I built it), the key technical decisions I made and why, "
+        "and the measurable outcomes.\n\n"
+        "For the Telus AI Agent project, this is a MULTI-PHASE project — cover ALL phases:\n"
+        "- Phase 1 (Pet Project): solo build, 78% benchmark, demo to Telus Fellow\n"
+        "- Phase 2 (Lab Ablation): systematic technique comparison on H100, pushed to 88%\n"
+        "- Phase 3 (Production): Google ADK multi-agent system, Google Chat frontend, Langfuse "
+        "observability, 4-dimension eval, 400+ engineers across 12 teams\n"
+        "Tell the full arc — this is the most compelling project because it shows initiative, "
+        "technical depth, leadership, and production impact.\n\n"
+        "For ShowMe, jasonchi.ai, and Cortex, explain the motivation, key technical decisions, and outcomes. "
+        "Highlight what each demonstrates about my engineering approach. If asked generally about projects, "
+        "always include Cortex at least briefly."
     ),
     "skills": (
         "Focus on technical skills, proficiencies, and tools. Group by domain (AI/ML, Cloud, Languages). "
@@ -78,6 +87,40 @@ CATEGORY_INSTRUCTIONS: dict[str, str] = {
     "honest-section": "Be extra transparent and honest. Discuss weaknesses, growth areas, preferences, and working style candidly.",
     "meta": "Focus on how this site works, the tech stack, and why it was built. Discuss the AI implementation and design decisions.",
 }
+
+JD_CATEGORY_INSTRUCTIONS: dict[str, str] = {
+    "work-experience": (
+        "A job description has been shared. Structure the work experience response to explicitly connect my "
+        "experience to the JD requirements.\n\n"
+        "CRITICAL: ONLY reference roles and companies from the Resume Content. Jason worked at Telus "
+        "Communications ONLY. NEVER invent experience at other companies to match JD requirements. "
+        "If a JD requirement has no matching experience, honestly note it as a gap.\n\n"
+        "For each role, map concrete outcomes to explicit JD needs using this pattern: "
+        "\"[What I did and achieved]. This directly addresses [specific JD requirement].\""
+    ),
+    "projects": (
+        "A job description has been shared. When discussing projects, prioritize project evidence most relevant "
+        "to JD requirements and explicitly map each point to a requirement.\n\n"
+        "Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). "
+        "Do not omit Cortex in general project answers; include it at least briefly and map it to relevant JD "
+        "themes (agentic workflows, automation, full-stack ownership, or systems thinking) when applicable.\n\n"
+        "IMPORTANT: The Telus AI Agent is a multi-phase project (pet project -> lab ablation -> production). "
+        "Cover ALL phases, especially production deployment and organizational impact."
+    ),
+    "skills": (
+        "A job description has been shared. Prioritize skills that directly match JD requirements, then include "
+        "adjacent transferable skills. Be explicit about depth and where each skill was used in projects or roles."
+    ),
+}
+
+
+def get_category_instruction(category: str | None, job_description: str = "") -> str:
+    """Return category instruction with JD-aware override when available."""
+    if not category:
+        return "Answer based on all available resume content."
+    if job_description and category in JD_CATEGORY_INSTRUCTIONS:
+        return JD_CATEGORY_INSTRUCTIONS[category]
+    return CATEGORY_INSTRUCTIONS.get(category, "Answer based on all available resume content.")
 
 JD_CONTEXT_SECTION = """
 

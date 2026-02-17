@@ -100,7 +100,7 @@ async def deep_retrieve(
         chunk_key = f"{prop.category}::{prop.section}"
         if chunk_key not in seen_chunks and prop.parent_chunk:
             seen_chunks.add(chunk_key)
-            content_parts.append(f"  Context: {prop.parent_chunk[:200]}")
+            content_parts.append(f"  Context: {prop.parent_chunk[:500]}")
 
     content = "\n".join(content_parts) if content_parts else "No relevant propositions found."
     sources = tuple(
