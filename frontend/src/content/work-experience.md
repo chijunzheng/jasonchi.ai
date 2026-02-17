@@ -35,6 +35,20 @@ order: 1
 - Built custom RAG pre-processing pipeline, Vertex AI Vector Search as vector database (chosen for tunable parameters: distance measure, neighbor count, leaf node search fraction), and multi-agent orchestration via Google ADK
 - Led 4 junior engineers through architecture, hands-on coding, and troubleshooting
 
+#### Agentic Document Ingestion Pipeline
+- Designed and built an agentic ingestion system to process 2,000+ documents (3GPP specs, ORAN standards, internal reports) from heterogeneous formats (PDF, DOCX, PPTX, XLSX, images) into a unified searchable index
+- Google Drive → GCS mirroring: Cloud Run cron job polls shared Google Drive folders every 10 minutes and syncs new/updated files to Cloud Storage — engineers simply drop documents into Drive and the pipeline handles the rest
+- Swarm-based parallel processing: each document dispatched to specialized agents — **VisualTranscriber** (Gemini vision for diagrams, flowcharts, architecture images), **DataTranscriber** (structured extraction from tables, spreadsheets, configuration files), **SemanticChunker** (hierarchical section-aware splitting with contextual summaries)
+- **Indexer** generates both dense embeddings (text-embedding-004) and sparse embeddings (BM25 term frequencies) per chunk, upserting into Vertex AI Vector Search with metadata for hybrid retrieval
+- Batch embedding API: groups chunks into batches of 250 for embedding generation — reduces API round trips by ~50x compared to per-chunk calls
+- Firestore ledger tracks processing state per document (pending → processing → indexed → failed) with idempotent retries — same document uploaded twice produces identical index state
+- Concurrency controls: asyncio semaphores limit parallel Gemini calls per swarm to stay within API quotas; exponential backoff with jitter on transient failures
+- Cloud Tasks for query-time CPU allocation: query requests enqueue a Cloud Task that calls back to a `/worker` endpoint on a high-CPU Cloud Run instance — decouples the lightweight API surface from compute-intensive retrieval and generation, enabling independent scaling of each tier
+
+#### Data Integration & Operational Context
+- Designed a BigQuery ETL pipeline syncing network configuration and KPI data from operational systems — enabling the agent to answer questions grounded in real-time operational context (e.g., "what's the current throughput for site X?"), not just static specifications
+- Cloud SQL stores structured metadata (document provenance, user feedback, evaluation results) while BigQuery handles analytical queries across network performance data — right tool for each query pattern
+
 #### Multi-Agent System & Context Management
 - Used Google ADK (Agent Development Kit) for multi-agent orchestration — selected for built-in tool use, memory management, and seamless Google GenAI API integration
 - **Short-term memory:** ADK's native database session service storing conversation history, events, and tool calls in Cloud SQL with structured schema
@@ -93,7 +107,8 @@ order: 1
 ### Tech I Used
 - **Backend:** Python, FastAPI, Uvicorn, Pydantic, PyYAML, aiohttp, httpx
 - **AI/ML:** Google ADK, Google GenAI API, Vertex AI Vector Search, Vertex AI Search (Discovery Engine), LangChain, Rank-BM25, NumPy, Pandas, OpenAI API, Fuelix APIs
-- **Cloud:** Google Cloud Run, Cloud Build, Cloud SQL (MySQL), Cloud Firestore, Google Cloud Storage, Google Cloud Tasks, Google Cloud Trace, Google Cloud Logging
+- **Cloud:** Google Cloud Run, Cloud Build, Cloud SQL (MySQL), Cloud Firestore, Google Cloud Storage, Google Cloud Tasks, Cloud Scheduler, Google Cloud Trace, Google Cloud Logging
+- **Data Processing:** BigQuery (ETL pipelines, KPI analytics), Cloud Tasks (async job orchestration), batch embedding APIs, asyncio concurrency controls
 - **Frontend:** Google Chat, Google Apps Script, Google Sheets API, Streamlit
 - **Observability:** Langfuse, OpenTelemetry, Looker, BigQuery, Data Studio
 - **Data Processing:** BeautifulSoup4, PyPDF, python-docx, python-pptx, Pillow, pdf2image, Openpyxl, Tabulate
@@ -107,6 +122,13 @@ order: 1
 - Led design and deployment of the Radio Management System (RMS) — an O-RAN SMO entity that enabled Telus to establish the world's first hybrid mode O-RAN M-plane architecture
 - Architected RMS as a cloud-native microservices app on Kubernetes; coordinated multi-vendor integration into production network
 - Recognized by Telus leadership for contributions to network automation and orchestration
+
+### Data Processing & Network Observability
+- Architected the data ingestion requirements for RMS's observability stack — specified the pipeline for ingesting logs, alarms, performance counters, and KPI metrics from 1,000+ production O-RAN radios across multiple vendors
+- Defined data schemas and processing requirements for heterogeneous vendor data formats — each radio vendor (Samsung, Nokia, Ericsson) exposes different log formats, alarm structures, and KPI naming conventions that needed normalization into a unified schema
+- Kubernetes-native pipeline: microservices on K8s consumed streaming telemetry data, applied vendor-specific parsers, and wrote normalized metrics to time-series storage — enabling cross-vendor performance comparison dashboards
+- Coordinated vendor integration: worked directly with Samsung, Nokia, and Ericsson engineering teams to validate data pipeline outputs — ensuring alarm correlation, KPI aggregation, and log enrichment met operational requirements
+- Data pipeline served as the foundation for automated anomaly detection and capacity planning — operators could identify degraded radios from dashboard alerts rather than manual log inspection
 
 ### The Pivot to AI
 - Experienced a daily pain point: engineers spending hours searching thousands of pages of 3GPP/ORAN specifications for answers that should be instantly queryable

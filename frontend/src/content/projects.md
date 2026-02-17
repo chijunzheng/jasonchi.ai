@@ -10,7 +10,8 @@ order: 2
 - Target audience: young learners (ages 5-12) who can't type fluently — existing AI tools are text-in/text-out with no active learning
 - Voice-first interaction lowers the barrier to entry; TTS makes generated content accessible to pre-readers
 - No existing platform combined AI content generation with gamified interactive learning modes
-- Submitted to the Gemini 3 hackathon — built end-to-end and deployed for judge access
+- Submitted to the Gemini 3 hackathon — built the entire application in 2 weeks, end-to-end, deployed live for judge access
+- Production-ready from day one: Cloud Run backend, Firestore persistence, Cloud Storage for assets — already on cloud databases and serverless infrastructure, scalable beyond the hackathon without architectural changes
 - Goal: prove that multimodal AI can power engaging education, not just chatbot Q&A
 
 ### What I Did
@@ -47,7 +48,7 @@ order: 2
 - Designed for serverless scaling: no in-memory state, all session data in Firestore
 
 ### The Result
-- 75K LOC across 276 source files — 125 React components, 17 custom hooks, 40+ API endpoints
+- 75K LOC across 276 source files in 2 weeks — 125 React components, 17 custom hooks, 40+ API endpoints
 - Voice-to-slideshow generation pipeline completes in under 30 seconds end-to-end
 - 4 AI models orchestrated with triple fallback — zero user-facing errors from AI failures
 - Submitted to Gemini 3 hackathon with live deployment
@@ -58,7 +59,7 @@ order: 2
 - Two-phase JIT generation in Wonder Lab: generating all content upfront wastes ~40% of API calls on paths users never explore — defer until the user commits to a branch
 - Firestore over SQL: document model maps naturally to knowledge graph nodes and edges; serverless scaling matches Cloud Run's autoscaling without connection pool management
 - Fallback chains are non-negotiable for child users — a 5-year-old cannot troubleshoot an error screen
-- **Built entirely with AI-assisted development.** 75K LOC in a hackathon timeframe was only possible because I used Claude Code with a structured workflow: decomposed the system into feature plan documents, identified which features could be built in parallel (e.g., learning modes are fully independent), and orchestrated multiple coding agents to implement them simultaneously. The velocity came from treating agent context as an engineering problem — not from writing less code, but from writing it in parallel
+- **75K LOC in 2 weeks is the proof point for AI-assisted development.** This was only possible because I used Claude Code with a structured workflow: decomposed the system into feature plan documents, identified which features could be built in parallel (e.g., the 3 learning modes are fully independent state machines), and orchestrated multiple coding agents to implement them simultaneously. The velocity came from treating agent context as an engineering problem — not from writing less code, but from writing it in parallel. The result isn't a throwaway prototype: it's deployed on cloud infrastructure with proper security middleware, rate limiting, and serverless scaling
 
 ### Tech I Used
 - **Frontend:** React 18, Vite 5, Tailwind CSS 3, Vitest, React Testing Library, Playwright
@@ -241,6 +242,13 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 - Google's managed RAG solution performed well in US region demo but was unusable in the Canadian region required by Telus data sovereignty policy — pivoted to building custom system with lower-level Google APIs
 - Built custom RAG pre-processing pipeline, Vertex AI Vector Search as vector database, and multi-agent orchestration via Google ADK (Agent Development Kit)
 
+##### Agentic Document Ingestion
+- Built agentic ingestion system processing 2,000+ documents from heterogeneous formats (PDF, DOCX, PPTX, XLSX, images) — Google Drive → GCS mirroring (10-min cron) → swarm-based parallel processing
+- Swarm architecture: **VisualTranscriber** (Gemini vision for diagrams/flowcharts), **DataTranscriber** (structured extraction from tables/spreadsheets), **SemanticChunker** (section-aware splitting with contextual summaries)
+- Indexer generates dense + sparse embeddings per chunk, batch API calls (250 chunks/batch), upserting into Vertex AI Vector Search for hybrid retrieval
+- Firestore ledger for idempotent processing state tracking; asyncio semaphores + exponential backoff for API quota management
+- Cloud Tasks pattern for query-time CPU allocation: lightweight API enqueues tasks to high-CPU worker instances, enabling independent scaling of API and compute tiers
+
 ##### Multi-Agent System & Memory
 - Google ADK for multi-agent orchestration — selected for built-in tool use, memory management, and seamless Google GenAI API integration
 - **Short-term memory:** ADK's native database session service storing conversation history, events, and tool calls in Cloud SQL
@@ -280,7 +288,7 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 ### Tech I Used
 - **Phase 1:** Python, FastAPI, Uvicorn, Pydantic, Streamlit, Google GenAI API, Vertex AI Vector Search, PyPDF, python-docx
 - **Phase 2:** PyTorch, Qwen-3-8B, H100 GPU, 8-bit quantization, Rank-BM25, contrastive learning, ORAN benchmark
-- **Phase 3:** Google ADK, Cloud Run, Cloud Build, Cloud SQL (MySQL), Firestore, Cloud Storage, Cloud Tasks, Google Chat, Apps Script, Langfuse, OpenTelemetry
+- **Phase 3:** Google ADK, Cloud Run, Cloud Build, Cloud SQL (MySQL), Firestore, Cloud Storage, Cloud Tasks, Cloud Scheduler, BigQuery, Google Chat, Apps Script, Langfuse, OpenTelemetry
 - **Tools:** Docker, Git, GitHub, GitLab, uv, Jupyter Notebook, Claude Code
 
 ---
