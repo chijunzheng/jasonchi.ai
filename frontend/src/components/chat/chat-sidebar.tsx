@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AvatarWithStatus } from '@/components/hero/avatar-with-status'
-import { ProofOfWork } from './proof-of-work'
+
 import { SITE_CONFIG } from '@/lib/constants'
 import type { ContentCategory } from '@/types/content'
 
@@ -112,10 +112,7 @@ export function ChatSidebar({
           })}
         </nav>
 
-        {/* Proof of work */}
-        <div className="border-t p-3">
-          <ProofOfWork />
-        </div>
+
       </aside>
     </>
   )

@@ -14,36 +14,36 @@ export function TldrCard() {
   const { copied, copy } = useCopyToClipboard()
 
   return (
-    <div className="rounded-2xl border bg-card/80 p-4 backdrop-blur-sm">
-      <div className="flex items-start gap-3">
-        <div className="flex-1">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            TL;DR
+    <div className="hero-surface rounded-2xl p-5 sm:p-6">
+      <div className="mx-auto max-w-[68ch] space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Executive Summary
           </p>
-          <p className="text-sm leading-relaxed">{TLDR}</p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hero-subsurface h-7 w-7 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-primary"
+                onClick={() => copy(TLDR)}
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-success" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+                <span className="sr-only">
+                  {copied ? 'Copied!' : 'Copy to clipboard'}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{copied ? 'Copied!' : 'Copy to clipboard'}</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={() => copy(TLDR)}
-            >
-              {copied ? (
-                <Check className="h-4 w-4 text-success" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-              <span className="sr-only">
-                {copied ? 'Copied!' : 'Copy to clipboard'}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{copied ? 'Copied!' : 'Copy to clipboard'}</p>
-          </TooltipContent>
-        </Tooltip>
+        <p className="text-[15px] leading-7 text-foreground/92 sm:text-base">{TLDR}</p>
       </div>
     </div>
   )

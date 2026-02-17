@@ -9,10 +9,12 @@ export function QuickFacts() {
       {QUICK_FACTS.map((fact) => {
         const Icon = ICON_MAP[fact.icon as keyof typeof ICON_MAP]
         return (
-          <div key={fact.id} className="rounded-lg border bg-card/50 p-3 text-center">
-            <Icon className="mx-auto mb-1.5 h-4 w-4 text-primary" />
-            <p className="text-xs font-medium text-muted-foreground">{fact.label}</p>
-            <p className="mt-0.5 text-sm font-semibold">{fact.value}</p>
+          <div key={fact.id} className="hero-subsurface rounded-xl p-3.5 text-center shadow-sm">
+            <Icon className="mx-auto mb-2 h-4 w-4 text-primary" />
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {fact.label}
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-snug text-balance">{fact.value}</p>
           </div>
         )
       })}

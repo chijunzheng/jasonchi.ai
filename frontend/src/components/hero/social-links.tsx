@@ -24,8 +24,8 @@ export function SocialLinks({ variant = 'default' }: SocialLinksProps) {
           rel="noopener noreferrer"
           className={
             isPrimary
-              ? 'flex items-center gap-1.5 rounded-full p-2 text-foreground/60 transition-colors hover:bg-muted hover:text-primary'
-              : 'rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+              ? 'hero-subsurface flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-foreground/65 transition-colors hover:border-primary/40 hover:text-primary'
+              : 'hero-subsurface rounded-full p-2 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
           }
           aria-label={label}
         >

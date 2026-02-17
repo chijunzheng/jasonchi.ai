@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { HERO_TITLE, HERO_TAGLINE } from '@/lib/constants'
+import { HERO_TITLE } from '@/lib/constants'
 import { AvatarWithStatus } from './avatar-with-status'
 import { StatsCounter } from './stats-counter'
 import { QuickFacts } from './quick-facts'
@@ -13,35 +13,34 @@ import type { JDAnalysis } from '@/types/jd-analysis'
 
 interface HeroSectionProps {
   readonly onEnterChat?: () => void
+  readonly onQueryChat?: (query: string) => void
   readonly onAnalysisComplete?: (jobDescription: string, analysis: JDAnalysis) => void
 }
 
-export function HeroSection({ onEnterChat, onAnalysisComplete }: HeroSectionProps) {
+export function HeroSection({ onEnterChat, onQueryChat, onAnalysisComplete }: HeroSectionProps) {
   return (
     <div className="relative h-full">
-      <section className="h-full overflow-hidden bg-grid-pattern px-4 pb-24 pt-16 sm:px-6 sm:pb-28 sm:pt-24">
-        <div className="mx-auto max-w-2xl space-y-8">
+      <section className="h-full overflow-y-auto bg-grid-pattern px-4 pb-36 pt-8 sm:px-6 sm:pb-40 sm:pt-10">
+        <div className="mx-auto max-w-3xl space-y-5">
           {/* Main hero card */}
-          <div className="rounded-3xl border bg-card/80 p-6 shadow-sm backdrop-blur-sm sm:p-8">
-            <div className="flex flex-col items-center space-y-6 text-center">
+          <div className="hero-surface rounded-[2rem] p-5 sm:p-7">
+            <div className="flex flex-col items-center space-y-5 text-center">
               {/* Avatar */}
               <AvatarWithStatus size="lg" />
 
               {/* Status pill */}
-              <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="hero-subsurface gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm"
+              >
                 <span className="status-dot inline-block h-2 w-2 rounded-full bg-success" />
                 Available for hire
               </Badge>
 
-              {/* Name + Title + Tagline */}
-              <div className="space-y-2">
-                <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-                  {HERO_TITLE}
-                </h1>
-                <p className="text-lg text-muted-foreground">
-                  {HERO_TAGLINE}
-                </p>
-              </div>
+              {/* Name */}
+              <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
+                {HERO_TITLE}
+              </h1>
 
               {/* Target Roles */}
               <TargetRoles />
@@ -64,12 +63,12 @@ export function HeroSection({ onEnterChat, onAnalysisComplete }: HeroSectionProp
           <TldrCard />
 
           {/* Social Proof */}
-          <SocialProof />
+          <SocialProof onQueryChat={onQueryChat} />
         </div>
       </section>
 
       {/* Pinned CTA at bottom with gradient fade */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-background via-background/80 to-transparent pb-6 pt-12">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-background via-background/85 to-transparent pb-6 pt-14">
         <div className="pointer-events-auto">
           <ScrollCTA onClick={onEnterChat} />
         </div>

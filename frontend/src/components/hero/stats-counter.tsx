@@ -8,7 +8,7 @@ export function StatsCounter() {
   const { ref, isIntersecting } = useIntersectionObserver({ threshold: 0.3 })
 
   return (
-    <div ref={ref} className="grid grid-cols-3 gap-4">
+    <div ref={ref} className="grid w-full grid-cols-3 gap-3 sm:gap-4">
       {STATS.map((stat) => (
         <StatItem
           key={stat.label}
@@ -36,12 +36,14 @@ function StatItem({
   const value = useCountUp(end, shouldAnimate)
 
   return (
-    <div className="text-center">
-      <p className="bg-gradient-to-br from-accent-gradient-from to-accent-gradient-to bg-clip-text font-mono text-3xl font-bold tabular-nums text-transparent sm:text-4xl">
+    <div className="hero-subsurface rounded-xl p-3 text-center">
+      <p className="font-heading text-3xl font-semibold tabular-nums text-primary sm:text-4xl">
         {value}
         {suffix}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
     </div>
   )
 }

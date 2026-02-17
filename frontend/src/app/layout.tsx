@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Lexend, Source_Sans_3 } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { FloatingThemeToggle } from '@/components/layout/floating-theme-toggle'
@@ -7,8 +7,13 @@ import { Analytics } from '@vercel/analytics/next'
 import { SITE_CONFIG } from '@/lib/constants'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const headingFont = Lexend({
+  variable: '--font-lexend',
+  subsets: ['latin'],
+})
+
+const bodyFont = Source_Sans_3({
+  variable: '--font-source-sans',
   subsets: ['latin'],
 })
 
@@ -64,11 +69,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${headingFont.variable} ${bodyFont.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange={false}
         >

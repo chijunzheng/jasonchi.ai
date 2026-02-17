@@ -12,6 +12,7 @@ export default function Home() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [jdContext, setJdContext] = useState<JdContext | null>(null)
+  const [initialQuery, setInitialQuery] = useState<string | null>(null)
   const heroRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<View>('hero')
   const isTransitioningRef = useRef(false)
@@ -75,6 +76,14 @@ export default function Home() {
     [clearTransitionLock],
   )
 
+  const handleQueryChat = useCallback(
+    (query: string) => {
+      setInitialQuery(query)
+      navigateTo('chat')
+    },
+    [navigateTo],
+  )
+
   const handleAnalysisComplete = useCallback(
     (jobDescription: string, analysis: JDAnalysis) => {
       setJdContext({ jobDescription, analysis })
@@ -100,6 +109,7 @@ export default function Home() {
       >
         <HeroSection
           onEnterChat={() => navigateTo('chat')}
+          onQueryChat={handleQueryChat}
           onAnalysisComplete={handleAnalysisComplete}
         />
       </div>
@@ -115,6 +125,8 @@ export default function Home() {
           onBackToHero={() => navigateTo('hero')}
           jdContext={jdContext}
           onClearJdContext={() => setJdContext(null)}
+          initialQuery={initialQuery}
+          onClearInitialQuery={() => setInitialQuery(null)}
         />
       </div>
     </div>

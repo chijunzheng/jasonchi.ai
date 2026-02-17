@@ -16,12 +16,12 @@ export function ScrollCTA({ onClick }: ScrollCTAProps) {
           document.getElementById('chat')?.scrollIntoView({ behavior: 'smooth' })
         }
       }}
-      className="gradient-button gradient-glow mx-auto flex items-center gap-2 rounded-full px-6 py-3 text-base font-medium transition-all"
+      className="group gradient-button gradient-glow mx-auto flex cursor-pointer items-center gap-2 rounded-full px-7 py-3 text-base font-semibold tracking-tight transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label="Go to chat section"
     >
-      <MessageCircle className="h-5 w-5" />
+      <MessageCircle className="h-[18px] w-[18px]" />
       Ask me anything
-      <ChevronDown className="h-4 w-4 animate-bounce" />
+      <ChevronDown className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
     </button>
   )
 }

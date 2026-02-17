@@ -20,23 +20,22 @@ export const NAV_ITEMS = [
 ] as const
 
 export const STATS = [
-  { label: 'Years Experience', value: 5, suffix: '+' },
-  { label: 'Apps Shipped', value: 23, suffix: '' },
-  { label: 'Tech Stacks', value: 12, suffix: '' },
+  { label: 'Engineers Served', value: 400, suffix: '+' },
+  { label: 'Teams Impacted', value: 12, suffix: '' },
+  { label: 'Tech Stacks', value: 15, suffix: '+' },
 ] as const
 
 export const QUICK_FACTS = [
   { id: 'location', icon: 'MapPin', label: 'Location', value: 'Markham, Ontario' },
   { id: 'availability', icon: 'Calendar', label: 'Status', value: 'Open to opportunities' },
   { id: 'workAuth', icon: 'Shield', label: 'US Work Eligibility', value: 'TN-visa eligible' },
-  { id: 'targetRoles', icon: 'Target', label: 'Target Roles', value: 'AI Engineer, AI Software Developer' },
+  { id: 'targetRoles', icon: 'Target', label: 'Target Roles', value: 'AI Engineer, Data Engineer, AI Software Developer' },
 ] as const
 
 export const HERO_TITLE = 'Jason Chi' as const
-export const HERO_TAGLINE = 'Building intelligent systems that bridge humans and machines' as const
-export const TARGET_ROLES = ['AI Engineer', 'AI Software Developer'] as const
+export const TARGET_ROLES = ['AI Engineer', 'Data Engineer', 'AI Software Developer'] as const
 
-export const TLDR = `TODO: Write your 2-3 sentence elevator pitch here. This is the TL;DR that recruiters will copy-paste to hiring managers. Make it count.` as const
+export const TLDR = `I started as a telecom engineer with no formal AI background and taught myself ML/GenAI by solving real engineering pain points across technical docs, network config files, and complex management systems. What began as an after-hours project became a production AI agent at Telus because it earned stakeholder trust and delivered clear business value. I built it using an AI-native engineering workflow I designed: plan docs with explicit feature dependencies, parallel implementation through Claude Code, Codex, and Cursor agents, multi-agent code reviews, and automated commits to keep delivery disciplined. I apply this same approach consistently across projects, including shipping a full-stack hackathon app in two weeks and building a personal AI assistant/second-brain I can interact with anywhere. I look forward to bringing this same learning velocity, adaptability, and execution rigor to drive broader organizational impact.` as const
 
 export const CONTENT_CATEGORIES = [
   'work-experience',

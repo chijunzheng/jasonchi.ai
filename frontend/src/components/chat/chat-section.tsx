@@ -14,9 +14,11 @@ interface ChatSectionProps {
   readonly onBackToHero?: () => void
   readonly jdContext?: JdContext | null
   readonly onClearJdContext?: () => void
+  readonly initialQuery?: string | null
+  readonly onClearInitialQuery?: () => void
 }
 
-export function ChatSection({ onBackToHero, jdContext, onClearJdContext }: ChatSectionProps) {
+export function ChatSection({ onBackToHero, jdContext, onClearJdContext, initialQuery, onClearInitialQuery }: ChatSectionProps) {
   const {
     messages,
     isLoading,
@@ -28,6 +30,17 @@ export function ChatSection({ onBackToHero, jdContext, onClearJdContext }: ChatS
     error,
   } = useChat({ jdContext: jdContext ?? undefined })
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Send initial query from hero chip clicks.
+  // Ref prevents strict mode double-fires.
+  const sentQueryRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (initialQuery && sentQueryRef.current !== initialQuery) {
+      sentQueryRef.current = initialQuery
+      sendMessage(initialQuery)
+      onClearInitialQuery?.()
+    }
+  }, [initialQuery, sendMessage, onClearInitialQuery])
 
   // Inject formatted analysis when JD context arrives (no API call needed).
   // sentJdRef prevents strict mode double-fires: on re-run, ref already
