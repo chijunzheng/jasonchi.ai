@@ -8,7 +8,7 @@ order: 5
 
 ### Currently Working On
 - **Frontend & full-stack depth.** My background is EE → RAN → AI engineering. I built jasonchi.ai in Next.js 16 / React 19 / TypeScript to push myself beyond backend Python — it's functional, but I'm still building intuition for component architecture, performance patterns, and design systems
-- **Scaling AI systems beyond a single team.** The Telus RAG system serves 400+ engineers across 12 teams, but I haven't yet dealt with multi-tenant AI platforms, cross-org model governance, or enterprise-scale prompt management — those are next-level challenges I want to tackle
+- **Scaling AI systems beyond a single team.** The Telus RAG platform is built for rollout across 12 teams (400+ engineers), but I haven't yet dealt with multi-tenant AI platforms, cross-org model governance, or enterprise-scale prompt management — those are next-level challenges I want to tackle
 - **Agentic system reliability.** Multi-agent orchestration with Google ADK works, but agent-to-agent communication is still fragile — error propagation, retry semantics, and graceful degradation across agent boundaries are patterns I'm actively learning through production experience
 - **Staying current with AI tooling velocity.** The landscape shifts monthly — I went from Gemini/NotebookLM to Cursor to Claude Code in under a year. Keeping my team current while filtering signal from hype is a skill I'm still refining
 

@@ -12,7 +12,7 @@ order: 1
 - Demoed to a Telus Fellow, earned full-time GenAI mandate within weeks
 - Used lab resources (single H100 GPU) to push benchmark accuracy to 88% through retrieval and fine-tuning improvements
 - Presented results to CTO, VP, and Director — project went from unsanctioned side project to company-backed production initiative within 2 months
-- Led a team of 4 junior engineers to ship a production agentic RAG system on GCP by end of 2025, serving 400+ engineers across 12 teams
+- Led a team of 4 junior engineers to build a production-ready agentic RAG platform on GCP by end of 2025, prepared for rollout across 12 teams (400+ engineers)
 
 ### What I Did
 
@@ -36,7 +36,7 @@ order: 1
 - Led 4 junior engineers through architecture, hands-on coding, and troubleshooting
 
 #### Agentic Document Ingestion Pipeline
-- Designed and built an agentic ingestion system to process 2,000+ documents (3GPP specs, ORAN standards, internal reports) from heterogeneous formats (PDF, DOCX, PPTX, XLSX, images) into a unified searchable index
+- Designed and built an agentic ingestion system to process 5,000+ documents (3GPP specs, ORAN standards, vendor documents, internal documents) from heterogeneous formats (PDF, DOCX, PPTX, XLSX, images) into a unified searchable index
 - Google Drive → GCS mirroring: Cloud Run cron job polls shared Google Drive folders every 10 minutes and syncs new/updated files to Cloud Storage — engineers simply drop documents into Drive and the pipeline handles the rest
 - Swarm-based parallel processing: each document dispatched to specialized agents — **VisualTranscriber** (Gemini vision for diagrams, flowcharts, architecture images), **DataTranscriber** (structured extraction from tables, spreadsheets, configuration files), **SemanticChunker** (hierarchical section-aware splitting with contextual summaries)
 - **Indexer** generates both dense embeddings (text-embedding-004) and sparse embeddings (BM25 term frequencies) per chunk, upserting into Vertex AI Vector Search with metadata for hybrid retrieval
@@ -46,8 +46,103 @@ order: 1
 - Cloud Tasks for query-time CPU allocation: query requests enqueue a Cloud Task that calls back to a `/worker` endpoint on a high-CPU Cloud Run instance — decouples the lightweight API surface from compute-intensive retrieval and generation, enabling independent scaling of each tier
 
 #### Data Integration & Operational Context
-- Designed a BigQuery ETL pipeline syncing network configuration and KPI data from operational systems — enabling the agent to answer questions grounded in real-time operational context (e.g., "what's the current throughput for site X?"), not just static specifications
-- Cloud SQL stores structured metadata (document provenance, user feedback, evaluation results) while BigQuery handles analytical queries across network performance data — right tool for each query pattern
+- Designed and implemented two production-grade ETL pipelines into centralized BigQuery:
+  1) KPI telemetry from Splunk
+  2) Site configuration data from on-prem vendor network element management platforms (distributed across multiple servers)
+- Purpose: give the Agentic AI system operational context, not just static document context, so answers can include current KPI trends and configuration state
+
+##### Pipeline A: Splunk KPI Data -> BigQuery (Step-by-Step)
+1. **Source mapping and schema contract**
+   - Cataloged Splunk indexes/sourcetypes for KPI events (throughput, latency, error rate, availability, utilization, counters).
+   - Defined canonical KPI schema in BigQuery (site_id, cell_id, vendor, kpi_name, kpi_value, interval_start/end, ingest_ts, source_server, parsing_version).
+   - Standardized units and naming conventions so multi-vendor KPI signals can be compared.
+   - Capacity-planned for ~5,000 sites with ~500 KPI metrics per site at a 15-minute cadence (~240M potential site-KPI intervals/day before filtering and aggregation).
+2. **Incremental extraction from Splunk**
+   - Implemented dual ingestion paths:
+     - **Push path:** Splunk HEC for near-real-time KPI delivery (low-latency operational feed).
+     - **Pull path:** Splunk Search API every 15 minutes using watermarks (`last_success_ts -> current_ts`) for completeness and reconciliation.
+   - Added hourly reconciliation jobs and nightly backfill jobs to recover delayed/missed records.
+   - Added retry/backoff and request throttling to protect Splunk clusters during peak windows.
+3. **Raw landing zone in cloud**
+   - Wrote raw extracts to GCS first (immutable batches) before transformation.
+   - Captured ingestion metadata (batch_id, extract_window, row_count, checksum, source_index) for traceability.
+   - Loaded raw batches into BigQuery `raw_kpi_*` partitioned tables for replayability and audit.
+   - Chose GCS-first landing over direct BigQuery ingestion to improve replay, auditability, and schema-change isolation.
+4. **Data quality gate (pre-transform)**
+   - Ran schema, null, duplicate, range, and timestamp-validity checks.
+   - Enforced quality thresholds (for example: mandatory-field completeness >=99.5%, duplicate rate <=0.5%, freshness lag <=30 minutes for curated operational views).
+   - Tagged bad records with reject reasons into quarantine tables instead of dropping silently.
+   - Published quality metrics per batch (accepted %, rejected %, top error types).
+5. **Transformation and normalization**
+   - Normalized vendor-specific KPI names/fields to a single semantic model.
+   - Converted units and aligned time granularity to a standard 15-minute analysis interval.
+   - Deduplicated by business keys (`site_id + cell_id + kpi_name + interval_start + source_server`).
+6. **Business modeling in BigQuery**
+   - Built fact tables (`fact_kpi_interval`) partitioned by date and clustered by site/cell/kpi for query efficiency.
+   - Built dimensions (`dim_site`, `dim_cell`, `dim_vendor`, `dim_kpi`) for consistent analytics joins.
+   - Added SLA views and trend views consumed by dashboards and AI runtime tools.
+7. **Reliable load and idempotency**
+   - Used staged tables + `MERGE` patterns for idempotent upserts.
+   - Ensured reruns produce the same end state (safe replay of failed windows).
+   - Recorded watermark advancement only after successful end-to-end load.
+8. **Orchestration and scaling**
+   - Used Cloud Tasks to fan out extraction/transform tasks by time slice or site group for parallel throughput.
+   - Applied queue-level rate limits and retry policies to control downstream pressure.
+   - Kept each worker stateless so failed tasks can be retried safely.
+9. **Monitoring and operations**
+   - Instrumented latency, freshness lag, row-volume drift, and failure rates with alerting thresholds.
+   - Used volume-drift rules (for example, significant deviation vs. rolling baseline) to detect upstream outages or parser regressions early.
+   - Added run-level audit logs for every ETL stage (extract, load raw, quality gate, transform, publish).
+   - Built backfill mode for historical reprocessing without disrupting daily incremental runs.
+
+##### Pipeline B: On-Prem Vendor Configuration Data -> BigQuery (Step-by-Step)
+1. **On-prem source discovery**
+   - Mapped configuration sources across multiple vendor element-management servers (Samsung as primary source, plus smaller vendor systems with different schemas/export mechanisms).
+   - Classified data domains: site parameters, cell definitions, software versions, feature flags, neighbor lists, hardware profiles.
+   - Created source-to-target mapping specs with field-level lineage.
+2. **Secure extraction from distributed servers**
+   - Implemented hybrid extraction by source capability:
+     - **API connectors** for Samsung and other vendor platforms with stable management APIs.
+     - **Scheduled encrypted file exports (SFTP)** for legacy servers without robust API support.
+   - Deployed extractor workers per source server to isolate failures and simplify retries.
+   - Standardized output format (CSV/JSON) and timestamped batch manifests.
+   - Enforced encrypted transfer to cloud ingress with integrity validation (checksums).
+3. **Landing and registry**
+   - Stored each file in a raw bucket path keyed by vendor/server/date/batch.
+   - Registered batches in a control table with status lifecycle (`received -> validated -> transformed -> published`).
+   - Kept original payloads immutable to support audit and replay.
+4. **Structural validation and parsing**
+   - Validated schema versions, mandatory fields, and referential dependencies between config entities.
+   - Enforced config quality checks (schema compliance, key uniqueness, cross-entity references, and allowed-value checks on critical parameters).
+   - Parsed vendor-specific payloads into normalized staging tables.
+   - Routed malformed files/rows to quarantine datasets with actionable error messages.
+5. **Configuration normalization and harmonization**
+   - Unified parameter names and enum values across vendors.
+   - Resolved entity identity keys (site/cell/sector) across systems to establish canonical IDs.
+   - Applied business rules to produce analysis-ready config records.
+6. **Change-data handling (history + current state)**
+   - Generated hash fingerprints to detect true config changes.
+   - Maintained SCD Type 2 history for key config tables (effective_from/effective_to/current_flag).
+   - Published both current-state views and change-history views for root-cause analysis.
+7. **Load patterns and consistency**
+   - Loaded normalized data into BigQuery `dim_config_*` tables with deterministic merge rules.
+   - Used transactional batch markers so partially failed loads do not become visible.
+   - Enabled safe reprocessing for late-arriving or corrected batches.
+8. **Cross-domain enrichment with KPI facts**
+   - Joined config dimensions with KPI fact tables to answer questions like:
+     - "Did a config change precede KPI degradation?"
+     - "Which sites with same vendor/software profile show similar failures?"
+   - Materialized join-friendly views to reduce query latency for analytics and AI tools.
+9. **Governance, security, and access**
+   - Applied dataset-level IAM separation for raw, staging, curated, and serving layers.
+   - Enforced PII/sensitive-field masking policies where needed.
+   - Added lineage metadata so each AI answer can trace back to source batch/time.
+
+##### How These Pipelines Powered the Agentic AI Platform
+- The Agentic system could combine document knowledge with live operational telemetry and current configuration state.
+- Tool calls in the AI workflow queried curated BigQuery views instead of raw feeds, improving answer consistency and trust.
+- ETL reliability controls (idempotency, retries, quality gates, lineage) reduced hallucination risk from bad or stale operational data.
+- Cloud SQL stored app/interaction metadata (document provenance, user feedback, evaluation results), while BigQuery handled large-scale KPI/config analytics.
 
 #### Multi-Agent System & Context Management
 - Used Google ADK (Agent Development Kit) for multi-agent orchestration — selected for built-in tool use, memory management, and seamless Google GenAI API integration
@@ -82,12 +177,12 @@ order: 1
 - Used AI coding agents (Cursor, then Claude Code) as a core part of my development workflow throughout this project — not as an occasional assist, but as a systematic practice that shaped how I architect and ship software
 - Developed a structured approach: decompose features into plan documents with explicit dependency graphs, identify parallelizable vs. sequential work, then orchestrate multiple coding agents simultaneously to implement features in parallel
 - Built custom agent skills (reusable prompt templates for plan generation, feature decomposition, and code review) that encode project context and coding standards — treating the agent's context as an engineering artifact
-- This workflow was a significant factor in the project's velocity: shipping a production agentic RAG system with a team of 4 juniors within a year, while maintaining evaluation coverage and code quality
+- This workflow was a significant factor in the project's velocity: building a production-ready agentic RAG platform with a team of 4 juniors within a year, while maintaining evaluation coverage and code quality
 - The meta-insight: the same agentic orchestration principles I apply to production AI systems (tool use, context management, parallel execution) also describe how I use AI coding tools — the skills are transferable in both directions
 
 ### The Result
 - Improved ORAN benchmark accuracy from 62% (raw LLM) to 88% — a 42% relative improvement — through fine-tuned embeddings (+3%), hybrid retrieval (+5%), fine-tuned generator LLM (+2%), and contextual chunking (+5%)
-- Took the project from a solo pet project to a production agentic RAG system on GCP, launched end of 2025, serving 400+ engineers across 12 teams
+- Took the project from a solo pet project to a production-ready agentic RAG platform on GCP by end of 2025, with pilot use and planned rollout across 12 teams (400+ engineers)
 - Reduced average time engineers spent searching 3GPP/ORAN specs from 2 hours to 20 minutes per query, freeing 1.5 hours per engineer per week
 - Led and upskilled 4 junior engineers, establishing practices around evaluation-driven AI development, agentic system design, and production observability
 - 4-dimension automated eval pipeline runs on every deployment, catching regressions before they reach users

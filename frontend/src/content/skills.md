@@ -36,7 +36,7 @@ Claude code, Codex, gemini-cli, pytorch, Hugging face, milvus, pinecone, weaviat
 - **Fine-tuning:** Continual pre-training (LLM), contrastive learning (embeddings), ablation-driven evaluation
 - **Evaluation:** LLM-as-judge, multi-dimension automated eval pipelines, shadow A/B testing, benchmark-driven development
 - **Guardrails & observability:** Langfuse tracing, context window management, graceful degradation patterns
-- **Data processing & pipelines:** Agentic document ingestion (2,000+ docs, swarm-based parallel processing), batch embedding APIs, ETL pipeline design (BigQuery), async job orchestration (Cloud Tasks), concurrency control (asyncio semaphores, rate limiting), idempotent processing with state tracking (Firestore ledger)
+- **Data processing & pipelines:** Agentic document ingestion (5,000+ docs, swarm-based parallel processing), dual-path Splunk KPI ETL (HEC push + 15-min Search API pull), Samsung-primary on-prem multi-server config ETL to centralized BigQuery, raw->staging->curated modeling with GCS landing, SCD Type 2 + current-state dimension design, Cloud Tasks orchestration, data quality gates (completeness/duplicates/referential/freshness), idempotent processing with state tracking (Firestore ledger)
 
 ## Soft Skills
 

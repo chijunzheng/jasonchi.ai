@@ -96,6 +96,9 @@ Honestly acknowledge 1-2 areas where my experience doesn't directly match, and b
 
   projects: `A job description has been shared. When discussing projects, highlight aspects most relevant to the JD requirements. For each project, explicitly note which skills or experiences demonstrated by the project map to specific JD requirements. ONLY reference projects from the Resume Content — never invent projects.
 
+For each project heading, include GitHub availability inline beside the project name using this style: "**Project Name — GitHub: [repo](url)**" or "**Project Name — GitHub: Private/Internal**" based only on Resume Content.
+For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)". Be explicit that production code is confidential while production architecture, outcomes, and decisions are discussable.
+
 Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). Do not omit Cortex in general project answers; include it at least briefly and map it to relevant JD themes when applicable.
 
 IMPORTANT: The Telus AI Agent is a multi-phase project (pet project → lab ablation → production). Cover ALL phases — especially Phase 3 (production deployment with Google ADK, multi-agent orchestration, 400+ engineers). The production phase is often the most relevant to JD requirements.`,
@@ -118,6 +121,9 @@ For the RAN Engineer role, keep it concise (3-4 bullets) but highlight the O-RAN
 
 After both roles, close with 1-2 sentences on what ties them together: domain expertise in telecom + self-driven pivot to AI engineering.`,
   projects: `Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). For each project, explain the motivation (why I built it), the key technical decisions I made and why, and the measurable outcomes.
+
+For each project heading, include GitHub availability inline beside the project name using this style: "**Project Name — GitHub: [repo](url)**" or "**Project Name — GitHub: Private/Internal**" based only on Resume Content.
+For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)". Be explicit that production code is confidential while production architecture, outcomes, and decisions are discussable.
 
 For the Telus AI Agent project, this is a MULTI-PHASE project — cover ALL phases:
 - Phase 1 (Pet Project): solo build, 78% benchmark, demo to Telus Fellow

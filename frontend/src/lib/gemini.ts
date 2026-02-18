@@ -54,7 +54,7 @@ export async function generateFollowUps(
 ): Promise<string[]> {
   try {
     const client = createClient()
-    const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
 
     const result = await model.generateContent(prompt)
     const text = result.response.text().trim()

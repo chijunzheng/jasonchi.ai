@@ -4,7 +4,7 @@ title: Projects
 order: 2
 ---
 
-## ShowMe — Voice-First AI Educational Platform
+## ShowMe — Voice-First AI Educational Platform (GitHub: [chijunzheng/ShowMe](https://github.com/chijunzheng/ShowMe))
 
 ### The Situation — why I built it
 - Target audience: young learners (ages 5-12) who can't type fluently — existing AI tools are text-in/text-out with no active learning
@@ -70,7 +70,7 @@ order: 2
 
 ---
 
-## jasonchi.ai — AI-Powered Portfolio with Reflective Agentic RAG
+## jasonchi.ai — AI-Powered Portfolio with Reflective Agentic RAG (GitHub: [chijunzheng/jasonchi.ai](https://github.com/chijunzheng/jasonchi.ai))
 
 ### The Situation — why I built it
 - Portfolio sites are static and forgettable — wanted an interactive one where recruiters ask questions and get AI-powered answers grounded in real content
@@ -127,12 +127,10 @@ order: 2
 
 ---
 
-## CSI-SandGlassNet — Deep Learning for Wireless Channel Compression
-
-GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGlassNet)
+## Master's Thesis Project: CSI-SandGlassNet — Deep Learning for Wireless Channel Compression (GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGlassNet))
 
 ### The Situation — why I built it
-- Master's thesis project at Liverpool John Moores University — designed a novel deep learning architecture for compressing wireless channel state information (CSI)
+- M.Sc. master's thesis project at Liverpool John Moores University (2024) — designed a novel deep learning architecture for compressing wireless channel state information (CSI)
 - CSI feedback is the bottleneck in massive MIMO systems: base stations need channel knowledge from user devices, but transmitting full CSI tensors consumes too much uplink bandwidth
 - Existing approaches: CsiNet (pure CNN) was fast but inaccurate at high compression; transformer-based models (TransNet, SwinCFNet) improved accuracy but at 5-20× higher compute cost
 - Goal: match transformer-level accuracy at CNN-level compute cost — a practical deployment requirement for real-time wireless systems
@@ -198,13 +196,14 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 
 ---
 
-## Telus AI Agent — From Pet Project to Production Agentic RAG
+## Telus AI Agent — From Pet Project to Production Agentic RAG (GitHub — Public POC: [chijunzheng/ORAN_RAG](https://github.com/chijunzheng/ORAN_RAG) | Production: Internal TELUS repo, confidential/NDA)
 
 ### The Situation — why I built it
 - Daily pain point as a RAN engineer: hours searching through thousands of pages of 3GPP/ORAN specifications for answers that should be instantly queryable
 - No existing tool handled the technical density and cross-reference nature of telecom specs — generic search returned noise
 - Opportunity to learn AI/ML by solving a real problem rather than following tutorials
-- What started as an unsanctioned side project built on personal time evolved through three distinct phases — pet project, lab optimization, and production deployment — ultimately serving 400+ engineers across 12 teams
+- What started as an unsanctioned side project built on personal time evolved through three distinct phases — pet project, lab optimization, and production-ready platform build — with rollout planned across 12 teams (400+ engineers)
+- Production implementation code is enterprise-confidential and not shareable; architecture, decisions, and measurable outcomes are fully discussable
 
 ### What I Did
 
@@ -237,7 +236,7 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 
 - **Result: 88% benchmark accuracy (26 points above raw LLM, 10 above naive RAG). Presented to CTO, VP, and Director — systematic ablation evidence secured the production mandate**
 
-#### Phase 3: Production Deployment on GCP (Team of 5)
+#### Phase 3: Production-Ready Platform Build on GCP (Team of 5)
 - Chose GCP for its AI capabilities and natural fit with Telus's Google Workspace workflows (Google Chat as primary interface)
 - Google's managed RAG solution performed well in US region demo but was unusable in the Canadian region required by Telus data sovereignty policy — pivoted to building custom system with lower-level Google APIs
 - Built custom RAG pre-processing pipeline, Vertex AI Vector Search as vector database, and multi-agent orchestration via Google ADK (Agent Development Kit)
@@ -248,6 +247,14 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 - Indexer generates dense + sparse embeddings per chunk, batch API calls (250 chunks/batch), upserting into Vertex AI Vector Search for hybrid retrieval
 - Firestore ledger for idempotent processing state tracking; asyncio semaphores + exponential backoff for API quota management
 - Cloud Tasks pattern for query-time CPU allocation: lightweight API enqueues tasks to high-CPU worker instances, enabling independent scaling of API and compute tiers
+
+##### Operational ETL Foundation (Splunk + On-Prem Config -> BigQuery)
+- Built dual-path Splunk KPI ingestion: HEC push for low-latency feed + Search API pull every 15 minutes for completeness/reconciliation, with hourly reconciliation and nightly backfill
+- Designed for ~5,000 sites with ~500 KPI metrics/site at 15-minute cadence (~240M potential site-KPI intervals/day before filtering), with watermark-based incremental processing
+- Used GCS as immutable raw landing before BigQuery (`raw -> staging -> curated`) to enable replay, auditability, and safe schema evolution
+- Integrated on-prem vendor configuration data from distributed servers using hybrid connectors (Samsung-primary API integration plus encrypted scheduled file export for smaller vendor systems)
+- Modeled configuration with SCD Type 2 history plus current-state views, then joined with KPI facts to support AI answers and root-cause analysis
+- Enforced quality gates (completeness, duplicates, referential checks, freshness SLA) with quarantine tables and batch-level lineage metadata
 
 ##### Multi-Agent System & Memory
 - Google ADK for multi-agent orchestration — selected for built-in tool use, memory management, and seamless Google GenAI API integration
@@ -265,7 +272,7 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 - Built automated evaluation pipeline: **Fact judge** (golden dataset by domain experts), **Retrieval judge** (LLM-generated query/chunk pairs), **Tool-call judge** (domain expert query/expected tool-call pairs), **Performance judge** (latency and cost vs. SLA)
 - Evaluation runs automatically on every Cloud Run deployment, with reports diffable against previous versions
 
-- **Result: Production agentic RAG launched end of 2025, serving 400+ engineers across 12 teams. Reduced spec search time from 2 hours to 20 minutes per query. User dissatisfaction improved from 50% to 30% after 3 months of feedback-driven iteration**
+- **Result: Production-ready agentic RAG platform completed by end of 2025, with pilot usage and planned rollout across 12 teams (400+ engineers). Reduced spec search time from 2 hours to 20 minutes per query. User dissatisfaction improved from 50% to 30% after 3 months of feedback-driven iteration**
 
 ### The Result (Full Journey)
 - Accuracy progression: 62% (raw LLM) → 78% (naive RAG) → 88% (optimized) — a 42% relative improvement
@@ -293,7 +300,7 @@ GitHub: [chijunzheng/CSI-SandGlassNet](https://github.com/chijunzheng/CSI-SandGl
 
 ---
 
-## Cortex (Second Brain) — Personal Life Management Assistant
+## Cortex (Second Brain) — Personal Life Management Assistant (GitHub: [chijunzheng/Cortex-second-brain](https://github.com/chijunzheng/Cortex-second-brain))
 
 ### The Situation — why I built it
 - Wanted a single-interface personal assistant that could capture memories, track finances, manage household inventory, and deliver automated digests — all through natural conversation in a chat interface (Telegram in this case)
