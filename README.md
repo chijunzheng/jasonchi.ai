@@ -45,3 +45,15 @@ python3 -m py_compile backend/main.py backend/graph/nodes/qa.py backend/config.p
 ## Deployment
 - Frontend: Next.js deployment target of choice
 - Backend: Docker/Cloud Run (`backend/Dockerfile`)
+
+### Cloud Run (2 Services)
+Use the committed Cloud Run Dockerfiles for repeatable redeploys:
+- `backend/Dockerfile.cloudrun`
+- `frontend/Dockerfile.cloudrun`
+
+Example flow:
+1. Build/push backend image and deploy `jasonchi-backend`.
+2. Build/push frontend image and deploy `jasonchi-frontend`.
+3. Set frontend env vars:
+   - `BACKEND_URL=https://<backend-service-url>`
+   - `NEXT_PUBLIC_BACKEND_URL=https://<backend-service-url>`
