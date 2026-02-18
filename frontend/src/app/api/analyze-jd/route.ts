@@ -3,12 +3,16 @@ import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getAllContentForPrompt } from '@/lib/content-loader'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { proxyToBackend } from '@/lib/backend-proxy'
+import { getBackendUrl } from '@/lib/backend-proxy'
 import { JDAnalysisSchema } from '@/types/jd-analysis'
 
 const requestSchema = z.object({
   jobDescription: z.string().min(50).max(10000),
 })
+
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+const SUPPORTED_UPLOAD_EXTENSIONS = new Set(['pdf', 'docx', 'txt', 'md'])
+const LOCAL_EXTRACTABLE_EXTENSIONS = new Set(['txt', 'md'])
 
 function getClientIp(request: NextRequest): string {
   return (
@@ -39,14 +43,106 @@ Guidelines:
 
 Be specific, reference actual requirements from the JD and actual experience from the resume.`
 
+function getFileExtension(filename: string): string {
+  const pieces = filename.toLowerCase().split('.')
+  return pieces.length > 1 ? pieces.at(-1)! : ''
+}
+
+function validateUpload(file: File): string | null {
+  const extension = getFileExtension(file.name)
+  if (!SUPPORTED_UPLOAD_EXTENSIONS.has(extension)) {
+    return 'Unsupported file type. Please upload a PDF, DOCX, TXT, or MD file.'
+  }
+
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+    return 'File is too large. Please upload a file smaller than 5MB.'
+  }
+
+  return null
+}
+
+async function parseRequestInput(request: NextRequest): Promise<{
+  jobDescription: string
+  file: File | null
+}> {
+  const contentType = request.headers.get('content-type')?.toLowerCase() ?? ''
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await request.formData()
+    const rawDescription = formData.get('jobDescription')
+    const rawFile = formData.get('file')
+    return {
+      jobDescription: typeof rawDescription === 'string' ? rawDescription.trim() : '',
+      file: rawFile instanceof File ? rawFile : null,
+    }
+  }
+
+  const body = await request.json()
+  const parsed = requestSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new Error('invalid-job-description')
+  }
+
+  return { jobDescription: parsed.data.jobDescription.trim(), file: null }
+}
+
+async function extractTextForLocalFallback(file: File): Promise<string> {
+  const extension = getFileExtension(file.name)
+  if (!LOCAL_EXTRACTABLE_EXTENSIONS.has(extension)) {
+    throw new Error('local-unsupported-file-type')
+  }
+  return (await file.text()).trim()
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    let parsedInput: { jobDescription: string; file: File | null }
+    try {
+      parsedInput = await parseRequestInput(request)
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: 'Please provide a valid job description (at least 50 characters).',
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const { jobDescription: rawDescription, file } = parsedInput
+
+    if (file) {
+      const uploadError = validateUpload(file)
+      if (uploadError) {
+        return new Response(
+          JSON.stringify({ error: uploadError }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+    }
 
     // Proxy to LangGraph backend if configured
-    const proxyResponse = await proxyToBackend('/api/analyze-jd', body)
-    if (proxyResponse) {
-      const data = await proxyResponse.json()
+    const backendUrl = getBackendUrl()
+    if (backendUrl) {
+      const backendRequest =
+        file != null
+          ? (() => {
+              const formData = new FormData()
+              if (rawDescription) formData.set('jobDescription', rawDescription)
+              formData.set('file', file)
+              return fetch(`${backendUrl}/api/analyze-jd`, {
+                method: 'POST',
+                body: formData,
+              })
+            })()
+          : fetch(`${backendUrl}/api/analyze-jd`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobDescription: rawDescription }),
+            })
+
+      const proxyResponse = await backendRequest
+      const data = await proxyResponse.json().catch(() => ({
+        error: 'Analysis failed. Please try again.',
+      }))
       return new Response(JSON.stringify(data), {
         status: proxyResponse.status,
         headers: { 'Content-Type': 'application/json' },
@@ -68,17 +164,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const parsed = requestSchema.safeParse(body)
-    if (!parsed.success) {
+    let jobDescription = rawDescription
+    if ((!jobDescription || jobDescription.length < 50) && file) {
+      try {
+        jobDescription = await extractTextForLocalFallback(file)
+      } catch {
+        return new Response(
+          JSON.stringify({
+            error:
+              'PDF/DOCX uploads require backend extraction. Configure BACKEND_URL to enable these formats.',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+    }
+
+    if (jobDescription.trim().length < 50) {
       return new Response(
         JSON.stringify({
-          error: 'Please provide a valid job description (at least 50 characters).',
+          error: 'Please provide a valid job description (at least 50 characters after extraction).',
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
       )
     }
-
-    const { jobDescription } = parsed.data
     const resumeContent = getAllContentForPrompt()
 
     const apiKey = process.env.GEMINI_API_KEY
@@ -114,7 +222,10 @@ Return ONLY the JSON object, nothing else.`
 
     const analysis = JDAnalysisSchema.parse(JSON.parse(jsonText))
 
-    return new Response(JSON.stringify(analysis), {
+    return new Response(JSON.stringify({
+      ...analysis,
+      _jobDescription: jobDescription,
+    }), {
       headers: {
         'Content-Type': 'application/json',
         'X-RateLimit-Remaining': String(remaining),

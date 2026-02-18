@@ -16,7 +16,7 @@ export function JDAnalyzerCTA() {
           </p>
         </div>
         <JDAnalyzerModal>
-          <Button>Analyze a JD</Button>
+          <Button>Analyze a Job Description</Button>
         </JDAnalyzerModal>
       </div>
     </div>

@@ -1,5 +1,5 @@
 export interface SSEEvent {
-  readonly type: 'text' | 'followUps' | 'trace' | 'eval' | 'done' | 'error'
+  readonly type: 'text' | 'status' | 'followUps' | 'trace' | 'eval' | 'done' | 'error'
   readonly content?: string | readonly string[] | TraceData | EvalComparisonData
 }
 

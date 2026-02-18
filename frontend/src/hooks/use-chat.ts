@@ -10,6 +10,24 @@ import { getMockResponse } from '@/lib/mock-responses'
 const MAX_HISTORY_MESSAGES = 10
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_CHAT === 'true'
 
+const QUERY_CATEGORY_HINTS: Record<string, ContentCategory> = {
+  'tell me about your work experience': 'work-experience',
+  'tell me about your projects': 'projects',
+  'tell me about your skills': 'skills',
+  'tell me about your education': 'education',
+  'tell me about your ai engineer role at telus': 'work-experience',
+  'tell me about your ran engineer role at telus': 'work-experience',
+  'how did your side project turn into a production mandate?': 'work-experience',
+  'tell me about leading and mentoring your team': 'work-experience',
+  'tell me about the showme hackathon project': 'projects',
+  "tell me about your master's thesis": 'education',
+}
+
+function inferCategoryFromQuery(query: string): ContentCategory | null {
+  const normalized = query.trim().toLowerCase().replace(/\s+/g, ' ')
+  return QUERY_CATEGORY_HINTS[normalized] ?? null
+}
+
 function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
@@ -21,6 +39,7 @@ interface UseChatOptions {
 export function useChat({ jdContext }: UseChatOptions = {}) {
   const [messages, setMessages] = useState<readonly ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingStatus, setLoadingStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] =
     useState<ContentCategory | null>(null)
@@ -39,6 +58,7 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
         }
         setMessages((prev) => [...prev, assistantMessage])
         setIsLoading(false)
+        setLoadingStatus(null)
       }, 800)
     },
     [],
@@ -74,7 +94,14 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
 
         for await (const event of streamSSE('/api/chat', requestBody)) {
           switch (event.type) {
+            case 'status':
+              setLoadingStatus((event.content as string) || 'Thinking...')
+              break
+
             case 'text':
+              if (fullContent.length === 0) {
+                setLoadingStatus(null)
+              }
               fullContent += event.content as string
               setMessages((prev) => {
                 const existing = prev.find((m) => m.id === assistantId)
@@ -131,6 +158,7 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
               throw new Error(event.content as string)
 
             case 'done':
+              setLoadingStatus(null)
               break
           }
         }
@@ -145,6 +173,7 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
         }
       } finally {
         setIsLoading(false)
+        setLoadingStatus(null)
       }
     },
     [jdContext?.jobDescription],
@@ -155,10 +184,17 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
       if (isLoading) return
 
       setError(null)
+      setLoadingStatus('Understanding your question...')
+      const inferredCategory = activeCategory ?? inferCategoryFromQuery(content)
+      if (!activeCategory && inferredCategory) {
+        setActiveCategory(inferredCategory)
+      }
+
       const userMessage: ChatMessage = {
         id: createId(),
         role: 'user',
         content,
+        category: inferredCategory ?? undefined,
         timestamp: Date.now(),
       }
 
@@ -166,9 +202,9 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
       setIsLoading(true)
 
       if (USE_MOCK) {
-        addMockResponse(activeCategory)
+        addMockResponse(inferredCategory)
       } else {
-        streamResponse(content, [...messages, userMessage], activeCategory)
+        streamResponse(content, [...messages, userMessage], inferredCategory)
       }
     },
     [isLoading, messages, activeCategory, addMockResponse, streamResponse],
@@ -180,11 +216,16 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
 
       setActiveCategory(category)
       setError(null)
+      setLoadingStatus('Understanding your question...')
+      const categoryPrompt =
+        category === 'projects'
+          ? 'Tell me about your projects and include GitHub links beside each project name. For Telus AI Agent, include both the public POC repo and internal production repo (confidential/NDA).'
+          : `Tell me about your ${category.replace(/-/g, ' ')}`
 
       const userMessage: ChatMessage = {
         id: createId(),
         role: 'user',
-        content: `Tell me about your ${category.replace(/-/g, ' ')}`,
+        content: categoryPrompt,
         category,
         timestamp: Date.now(),
       }
@@ -197,7 +238,7 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
         addMockResponse(category)
       } else {
         streamResponse(
-          `Tell me about your ${category.replace(/-/g, ' ')}`,
+          categoryPrompt,
           updated,
           category,
         )
@@ -245,6 +286,7 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
     if (lastUserMessage) {
       setError(null)
       setIsLoading(true)
+      setLoadingStatus('Understanding your question...')
 
       if (USE_MOCK) {
         addMockResponse(activeCategory)
@@ -257,6 +299,7 @@ export function useChat({ jdContext }: UseChatOptions = {}) {
   return {
     messages,
     isLoading,
+    loadingStatus,
     activeCategory,
     sendMessage,
     injectAssistantMessage,

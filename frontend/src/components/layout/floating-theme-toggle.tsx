@@ -16,7 +16,7 @@ export function FloatingThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="fixed right-4 top-4 z-50">
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-[calc(env(safe-area-inset-left)+1rem)] z-50">
         <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shadow-md" disabled>
           <span className="sr-only">Toggle theme</span>
         </Button>
@@ -27,7 +27,7 @@ export function FloatingThemeToggle() {
   const isDark = theme === 'dark'
 
   return (
-    <div className="fixed right-4 top-4 z-50">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-[calc(env(safe-area-inset-left)+1rem)] z-50">
       <Button
         variant="outline"
         size="icon"
