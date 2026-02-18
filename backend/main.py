@@ -1,19 +1,22 @@
 """FastAPI application — same API contract as Next.js route handlers."""
 
 import asyncio
+import io
 import json
 import logging
 import os
 import re
 import time
 from collections import defaultdict
+from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from config import settings
 
@@ -33,8 +36,10 @@ from eval.metrics import (
 )
 from eval.shadow_runner import run_naive_shadow
 from graph.builder import app_graph
+from graph.nodes.qa import stream_fast_path_events, stream_reflective_events
 from graph.state import GraphState
 from graph.tools.content_index import get_content_index
+from prompts.templates import CATEGORY_INSTRUCTIONS
 
 load_dotenv()
 
@@ -74,6 +79,110 @@ async def _startup_prewarm() -> None:
 # ---------- Rate limiting (in-memory, same as MVP) ----------
 
 _rate_store: dict[str, list[float]] = defaultdict(list)
+
+
+def _normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())
+
+
+def _infer_category_from_message(message: str) -> str | None:
+    """Infer a category for high-signal prompts when frontend category is missing."""
+    normalized = _normalize_text(message)
+    if not normalized:
+        return None
+
+    # Exact mappings for known overview/highlight chips.
+    exact_map = {
+        "tell me about your work experience": "work-experience",
+        "tell me about your projects": "projects",
+        "tell me about your skills": "skills",
+        "tell me about your education": "education",
+        "tell me about your ai engineer role at telus": "work-experience",
+        "tell me about your ran engineer role at telus": "work-experience",
+        "how did your side project turn into a production mandate?": "work-experience",
+        "tell me about leading and mentoring your team": "work-experience",
+        "tell me about the showme hackathon project": "projects",
+        "tell me about your master's thesis": "education",
+    }
+    if normalized in exact_map:
+        return exact_map[normalized]
+
+    # Conservative keyword hints.
+    if any(
+        key in normalized
+        for key in (
+            "side project",
+            "production mandate",
+            "ai engineer role",
+            "ran engineer role",
+            "work experience",
+            "telus role",
+        )
+    ):
+        return "work-experience"
+
+    if any(
+        key in normalized
+        for key in (
+            "showme",
+            "cortex",
+            "hackathon",
+            "project",
+            "jasonchi.ai",
+        )
+    ):
+        return "projects"
+
+    if any(
+        key in normalized
+        for key in (
+            "skill",
+            "tech stack",
+            "tools",
+            "language",
+            "framework",
+        )
+    ):
+        return "skills"
+
+    if any(
+        key in normalized
+        for key in (
+            "education",
+            "master",
+            "thesis",
+            "degree",
+            "certification",
+        )
+    ):
+        return "education"
+
+    if any(
+        key in normalized
+        for key in (
+            "weakness",
+            "growth area",
+            "management style",
+            "work best",
+            "honest",
+        )
+    ):
+        return "honest-section"
+
+    if any(
+        key in normalized
+        for key in (
+            "about this site",
+            "how this site works",
+            "site built",
+            "model powers",
+            "hosted",
+            "stack for this site",
+        )
+    ):
+        return "meta"
+
+    return None
 
 
 def _check_rate_limit(ip: str) -> tuple[bool, int]:
@@ -227,6 +336,71 @@ class SessionSummaryRequest(BaseModel):
     messages: list[dict] = Field(min_length=3, max_length=50)
 
 
+_SUPPORTED_JD_FILE_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
+_MAX_JD_UPLOAD_BYTES = 5 * 1024 * 1024
+
+
+async def _extract_uploaded_jd_text(upload: UploadFile) -> str:
+    """Extract text from an uploaded job description file."""
+    filename = upload.filename or "job-description"
+    suffix = Path(filename).suffix.lower()
+    if suffix not in _SUPPORTED_JD_FILE_EXTENSIONS:
+        raise ValueError("Unsupported file type. Please upload PDF, DOCX, TXT, or MD.")
+
+    raw = await upload.read()
+    if not raw:
+        raise ValueError("Uploaded file is empty.")
+    if len(raw) > _MAX_JD_UPLOAD_BYTES:
+        raise ValueError("File is too large. Please upload a file smaller than 5MB.")
+
+    if suffix in {".txt", ".md"}:
+        return raw.decode("utf-8", errors="ignore").strip()
+
+    if suffix == ".pdf":
+        try:
+            from pypdf import PdfReader
+        except ImportError as exc:
+            raise RuntimeError("PDF extraction dependency is not available.") from exc
+
+        reader = PdfReader(io.BytesIO(raw))
+        text_chunks = [(page.extract_text() or "").strip() for page in reader.pages]
+        return "\n".join(chunk for chunk in text_chunks if chunk).strip()
+
+    if suffix == ".docx":
+        try:
+            from docx import Document
+        except ImportError as exc:
+            raise RuntimeError("DOCX extraction dependency is not available.") from exc
+
+        document = Document(io.BytesIO(raw))
+        paragraphs = [p.text.strip() for p in document.paragraphs if p.text and p.text.strip()]
+        return "\n".join(paragraphs).strip()
+
+    raise ValueError("Unsupported file type. Please upload PDF, DOCX, TXT, or MD.")
+
+
+async def _resolve_jd_analysis_input(request: Request) -> str:
+    """Resolve JD text from JSON payload or multipart upload."""
+    content_type = request.headers.get("content-type", "").lower()
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        raw_text = form.get("jobDescription")
+        typed_text = raw_text.strip() if isinstance(raw_text, str) else ""
+
+        if len(typed_text) >= 50:
+            return typed_text
+
+        uploaded = form.get("file")
+        if isinstance(uploaded, (UploadFile, StarletteUploadFile)):
+            return await _extract_uploaded_jd_text(uploaded)
+        return typed_text
+
+    payload = await request.json()
+    parsed = JDAnalysisRequest.model_validate(payload)
+    return parsed.jobDescription.strip()
+
+
 # ---------- Endpoints ----------
 
 
@@ -250,17 +424,60 @@ async def chat(body: ChatRequest, request: Request):
             messages.append(AIMessage(content=msg["content"]))
     messages.append(HumanMessage(content=body.message))
 
+    effective_category = body.category or _infer_category_from_message(body.message)
+    if body.category is None and effective_category is not None:
+        logger.info(
+            "Inferred category='%s' from message='%s'",
+            effective_category,
+            body.message[:80],
+        )
+
     initial_state = GraphState(
         messages=messages,
         intent="chat",
-        category=body.category,
+        category=effective_category,
         job_description=body.jobDescription or "",
     )
 
     async def generate():
         shadow_task = None
         try:
-            logger.info("Chat request: category=%s, message='%s'", body.category, body.message[:80])
+            logger.info("Chat request: category=%s, message='%s'", effective_category, body.message[:80])
+
+            # Stream chat responses when shadow eval is disabled.
+            # Shadow eval requires a completed final response object from the graph.
+            if not settings.enable_shadow_eval:
+                is_fast_category = bool(
+                    effective_category
+                    and effective_category in CATEGORY_INSTRUCTIONS
+                )
+
+                streamed_state: GraphState | None = None
+                stream_fn = stream_fast_path_events if is_fast_category else stream_reflective_events
+                async for event in stream_fn(initial_state):
+                    if event.get("type") == "text":
+                        chunk = str(event.get("content", ""))
+                        if chunk:
+                            yield f"data: {json.dumps({'type': 'text', 'content': chunk})}\n\n"
+                    elif event.get("type") == "status":
+                        status = str(event.get("content", ""))
+                        if status:
+                            yield f"data: {json.dumps({'type': 'status', 'content': status})}\n\n"
+                    elif event.get("type") == "state":
+                        payload = event.get("content")
+                        if isinstance(payload, dict):
+                            streamed_state = GraphState(**payload)
+
+                if streamed_state is None:
+                    raise RuntimeError("Streaming path finished without final state")
+
+                if streamed_state.follow_ups:
+                    yield f"data: {json.dumps({'type': 'followUps', 'content': streamed_state.follow_ups})}\n\n"
+
+                trace = _trace_to_dict(streamed_state)
+                yield f"data: {json.dumps({'type': 'trace', 'content': trace})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                return
 
             # Optionally run naive shadow pipeline in parallel for A/B eval
             if settings.enable_shadow_eval:
@@ -325,7 +542,7 @@ async def chat(body: ChatRequest, request: Request):
 
 
 @app.post("/api/analyze-jd")
-async def analyze_jd(body: JDAnalysisRequest, request: Request):
+async def analyze_jd(request: Request):
     ip = _get_client_ip(request)
     allowed, remaining = _check_rate_limit(ip)
     if not allowed:
@@ -335,17 +552,41 @@ async def analyze_jd(body: JDAnalysisRequest, request: Request):
             headers={"X-RateLimit-Remaining": str(remaining)},
         )
 
+    try:
+        job_description = await _resolve_jd_analysis_input(request)
+    except ValueError as exc:
+        return JSONResponse(
+            {"error": str(exc)},
+            status_code=400,
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
+    except Exception:
+        logger.exception("JD analysis request parse failed")
+        return JSONResponse(
+            {"error": "Please provide a valid job description (at least 50 characters)."},
+            status_code=400,
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
+
+    if len(job_description) < 50:
+        return JSONResponse(
+            {"error": "Please provide a valid job description (at least 50 characters after extraction)."},
+            status_code=400,
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
+
     initial_state = GraphState(
         intent="jd_analysis",
-        job_description=body.jobDescription,
+        job_description=job_description,
     )
 
     try:
-        logger.info("JD analysis request: %d chars", len(body.jobDescription))
+        logger.info("JD analysis request: %d chars", len(job_description))
         result = await app_graph.ainvoke(initial_state)
         state = GraphState(**result) if isinstance(result, dict) else result
 
-        response_body = state.analysis_result or {}
+        response_body = dict(state.analysis_result or {})
+        response_body["_jobDescription"] = job_description
         response_body["_trace"] = _trace_to_dict(state)
         logger.info("JD analysis complete: tokens=%d", state.total_tokens)
 

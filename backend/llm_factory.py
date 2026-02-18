@@ -11,10 +11,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from config import settings
 
 
-def make_chat_llm() -> ChatGoogleGenerativeAI:
+def _make_chat_llm(model_name: str) -> ChatGoogleGenerativeAI:
     """Create a ChatGoogleGenerativeAI with best-effort retry configuration."""
     base_kwargs = {
-        "model": settings.model_name,
+        "model": model_name,
         "google_api_key": settings.gemini_api_key,
     }
 
@@ -25,6 +25,16 @@ def make_chat_llm() -> ChatGoogleGenerativeAI:
         if "retries" in str(e):
             return ChatGoogleGenerativeAI(**base_kwargs)
         raise
+
+
+def make_chat_llm() -> ChatGoogleGenerativeAI:
+    """Create the primary answer-generation chat LLM."""
+    return _make_chat_llm(settings.model_name)
+
+
+def make_followup_llm() -> ChatGoogleGenerativeAI:
+    """Create the lightweight follow-up generation LLM."""
+    return _make_chat_llm(settings.followup_model_name)
 
 
 def make_embeddings_model() -> GoogleGenerativeAIEmbeddings:

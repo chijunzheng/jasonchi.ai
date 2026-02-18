@@ -17,9 +17,13 @@ CATEGORIES = [
 ]
 
 
-@lru_cache(maxsize=16)
-def _load_file(path: Path) -> str:
-    """Load and parse a single markdown file, stripping frontmatter."""
+@lru_cache(maxsize=32)
+def _load_file(path: Path, mtime_ns: int) -> str:
+    """Load and parse a single markdown file, stripping frontmatter.
+
+    mtime_ns is part of the cache key so edits invalidate cache without restart.
+    """
+    _ = mtime_ns
     if not path.exists():
         return ""
     post = frontmatter.load(str(path))
@@ -29,7 +33,11 @@ def _load_file(path: Path) -> str:
 def get_content(category: str) -> str:
     """Load content for a specific category."""
     path = settings.content_dir / f"{category}.md"
-    return _load_file(path)
+    try:
+        mtime_ns = path.stat().st_mtime_ns if path.exists() else -1
+    except OSError:
+        mtime_ns = -1
+    return _load_file(path, mtime_ns)
 
 
 def get_all_content() -> str:

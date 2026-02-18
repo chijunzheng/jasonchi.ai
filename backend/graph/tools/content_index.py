@@ -253,17 +253,44 @@ async def _compute_embeddings(texts: list[str]) -> np.ndarray:
 
 # Singleton content index with async initialization
 _content_index: ContentIndex | None = None
+_content_signature: tuple[tuple[str, int, int], ...] | None = None
 _index_lock = asyncio.Lock()
+
+
+def _compute_content_signature() -> tuple[tuple[str, int, int], ...]:
+    """Return a cheap fingerprint for source markdown files."""
+    signature: list[tuple[str, int, int]] = []
+    for category in CATEGORIES:
+        path = settings.content_dir / f"{category}.md"
+        try:
+            stat = path.stat()
+            signature.append((category, stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            signature.append((category, -1, 0))
+    return tuple(signature)
 
 
 async def get_content_index() -> ContentIndex:
     """Get or build the singleton content index."""
-    global _content_index
-    if _content_index is not None:
+    global _content_index, _content_signature
+    current_signature = _compute_content_signature()
+
+    if _content_index is not None and _content_signature == current_signature:
         return _content_index
+
     async with _index_lock:
+        # Re-check under lock in case another request rebuilt it.
+        current_signature = _compute_content_signature()
+
         if _content_index is None:
             logger.info("First request — building content index...")
             _content_index = await ContentIndex.build()
+            _content_signature = current_signature
             logger.info("Content index ready")
+        elif _content_signature != current_signature:
+            logger.info("Content source changed — rebuilding content index...")
+            _content_index = await ContentIndex.build()
+            _content_signature = current_signature
+            logger.info("Content index refreshed")
+
         return _content_index

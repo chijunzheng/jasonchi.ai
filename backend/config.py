@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     port: int = 8000
     content_dir: Path = Path(__file__).resolve().parent.parent / "frontend" / "src" / "content"
     model_name: str = "gemini-3-flash-preview"
+    # Lower-latency model for follow-up chip generation.
+    followup_model_name: str = "gemini-2.5-flash-lite"
     embedding_model: str = "models/gemini-embedding-001"
     max_history_messages: int = 10
     rate_limit_rpm: int = 20
@@ -68,13 +70,17 @@ class Settings(BaseSettings):
     # Skip the evaluate step in reflective pipeline (saves 1 LLM call + corrective retrieval).
     # When True, retrieved context goes straight to answer generation without quality scoring.
     skip_evaluation: bool = True
-    # Generate follow-up questions via LLM (adds ~3-4s latency per response).
+    # Skip the assess LLM call for reflective chat and use direct retrieval planning.
+    # Reduces first-token latency for follow-up queries.
+    skip_assessment_for_reflective: bool = True
+    # Generate follow-up questions via LLM.
+    # Uses followup_model_name for lower latency.
     generate_followups_with_llm: bool = True
     # Prewarm content index on startup in a background task.
     prewarm_content_index: bool = True
     # Minimum gap between Gemini API calls, to avoid burst 429s on low-quota accounts.
-    # 4.0 ~= 15 RPM max, 6.0 ~= 10 RPM max.
-    gemini_min_call_interval_seconds: float = 4.0
+    # Keep low for responsive UX; increase via env if you encounter 429 spikes.
+    gemini_min_call_interval_seconds: float = 0.8
     # langchain_google_genai retries can spam quota on 429; default to fail-fast.
     gemini_max_retries: int = 0
     enable_shadow_eval: bool = False
