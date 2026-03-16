@@ -4,6 +4,81 @@ title: Projects
 order: 2
 ---
 
+## Prism — AI-Native Portfolio Intelligence System (GitHub: [chijunzheng/prism-holdings-intelligence-system](https://github.com/chijunzheng/prism-holdings-intelligence-system))
+
+### The Situation — why I built it
+- Retail investors lack institutional-grade analysis tools — they read headlines and react emotionally to market events, with no way to understand how a specific event impacts their specific portfolio in dollar terms
+- Single-agent AI produces surface-level analysis: it can get directional accuracy right (92%) but structurally cannot identify portfolio-specific risks (0.1-0.3/5) or generate actionable recommendations (0.0/5)
+- Goal: build a multi-agent adversarial analysis system that detects live market signals, runs them through 10+ specialized agents, and produces calibrated dollar-impact estimates grounded in real market data — never auto-executing trades, always presenting options with tradeoffs
+- Target platform: Wealthsimple. Deployed live at https://prism-671115882624.us-central1.run.app/
+
+### What I Did
+
+#### Multi-Agent Adversarial Pipeline (11 Nodes, LangGraph StateGraph)
+- Designed an 11-node pipeline orchestrated via LangGraph with parallel fan-out, adversarial debate, and a quality gate feedback loop
+- Stage 0: parallel preparation — infer risk profile from portfolio composition (pure computation, no LLM) + fetch historical prices, computed volatility, and correlation matrix from Yahoo Finance (24h TTL cache)
+- Stage 1: 4 analyst agents run in parallel (macro, fundamental, sentiment, technical) — each uses Gemini 3 Flash with Google Search grounding for live market data, producing direction, magnitude (0-1 qualitative scale), confidence, and per-ticker impacts with cited evidence
+- Stage 2: adversarial debate — bull vs bear researcher argue 1-3 rounds using analyst findings, with convergence detection (both sides agree on direction OR both make concessions OR max 3 rounds) producing a debate resolution with unresolved disagreements explicitly flagged
+- Stage 3: 3 risk management agents in parallel — assumptions challenger (scores confidence on every claim, identifies blind spots), magnitude validator (clamps estimates exceeding 3× monthly historical volatility from Yahoo Finance), portfolio stress tester (10,000 Monte Carlo simulations using real correlation matrix, VaR/CVaR at 95th and 99th percentiles)
+- Stage 4: fund manager synthesizes all upstream inputs into 2-3 recommendation options (always including a "do nothing" baseline), then a judge agent evaluates quality across 5 dimensions — if insufficient, sends feedback for refinement (max 2 loops)
+- Stage 5: research brief assembled via pure template formatting (no LLM), 11 sections with cited sources, downloadable as PDF
+
+#### Calibration Engine — LLMs Reason, Math Computes
+- Core design principle: LLMs provide qualitative reasoning (direction, causal chains, magnitude 0-1), formulas convert to calibrated dollar ranges. No dollar amount ever comes directly from an LLM
+- 6-layer anchoring: portfolio value bounds (hard ceiling) → exposure weights → real historical volatility from Yahoo Finance → multi-analyst qualitative consensus → formula-based calibration (`mid = holdingValue × magnitudeScore × direction × timeMultiplier`, confidence-adaptive range widths) → Monte Carlo stress testing validation
+- Time horizon scaling via sqrt-of-time: 1W = 0.49, 1M = 1.0, 6M = 2.45 — industry-standard volatility scaling
+- Magnitude clamping: any analyst-estimated magnitude exceeding 3× monthly historical volatility is clamped, preventing LLM hallucination from producing unrealistic dollar estimates
+- Confidence-adaptive ranges: high confidence → tighter range (3.3:1 ratio at 0.9), low confidence → wider range (3.9:1 ratio at 0.5) — system expresses "$150-$350" not "$247.32"
+
+#### Human-in-the-Loop Checkpoints (4 Structural Pause Points)
+- Uses LangGraph `interrupt()` with `interrupt_before` edges — state persisted via `MemorySaver` checkpointer, resume via `Command({ resume })`
+- 4 checkpoints: after analyst team (review 4 perspectives), after debate (challenge consensus), after risk challenges (override assessments), and verdict preview (review dollar impacts before recommendations)
+- Soft checkpoint behavior: auto-continues after timeout, but "I have feedback" button allows users to inject domain knowledge — pipeline recalibrates all downstream stages when user provides input
+- Two pipeline modes: guided (checkpoints enabled, threadId-based persistence) and quick (stateless, used for eval harness)
+
+#### Single Chat Interface (React 19 + Vite 6)
+- Everything happens in one conversation stream — no separate pages. Rich card components (signal cards, pipeline progress, checkpoint cards, analysis report) render inline in the chat
+- SSE streaming with 17 event types for real-time progressive rendering: agent thinking text, stage completions, checkpoint data, final verdict, research brief
+- Three-panel layout: left sidebar (sessions/holdings/signals), center chat area with card renderer, right action center for analysis details
+- Holdings panel shows real-time portfolio values and daily P&L, with "Planned Changes" section where saved recommendation actions appear
+- Discriminated union pattern for card dispatch: `ChatCardRenderer.tsx` handles all card types via type-safe switch on message type
+
+#### Query Router & Chat Agent
+- Gemini-powered intent classification: chat (general conversation) / pipeline (single-signal deep analysis) / portfolio_review (multi-signal analysis)
+- Pipeline sub-modes: existing_signal, risk_check, improve_portfolio, explore_ticker, new_event
+- Ticker disambiguation handles ambiguous words (MY, ALL, THE, IT) using context to determine ticker vs regular word
+- Chat agent refuses definitive buy/sell recommendations — presents options with tradeoffs instead
+
+### The Result
+- Multi-agent pipeline scores 4.2/5.0 overall vs 1.5/5.0 for single-agent (Gemini Flash or Pro) across 25 historical macro events
+- Risk identification: 5.0/5.0 vs 0.1-0.3/5.0 — single-agent models structurally cannot identify portfolio-specific risks
+- Recommendation quality: 4.6/5.0 vs 0.0/5.0 — single-agent cannot generate actionable multi-option recommendations with tradeoffs
+- Range coverage (actual returns within predicted range): 68% vs 36-48% — calibration engine with volatility clamping produces realistic bounds
+- Causal reasoning: 4.9/5.0 vs 2.9-3.0/5.0 — adversarial debate forces mechanism reasoning, not correlation-as-causation
+- Full pipeline runs on Gemini 3 Flash (cheaper model) yet outperforms single-agent Gemini Pro (expensive model) on every quality dimension
+- 25-event eval harness across 6 categories: rate decisions, CPI surprises, oil shocks, banking stress, geopolitical events, currency/FX moves — each with ground truth 5-day returns from Yahoo Finance
+- pnpm monorepo with 4 packages (agents, server, frontend, shared), TypeScript + Zod throughout, deployed on Google Cloud Run
+
+### Real Talk
+- **The key architectural insight is separation of qualitative and quantitative reasoning.** LLMs hallucinate numbers — asking GPT/Gemini "how much will NVDA drop?" produces confident but ungrounded figures. By constraining LLMs to qualitative assessment (direction, magnitude 0-1, confidence) and routing dollar computation through formulas bounded by real volatility data, the system produces estimates that are both AI-informed and statistically defensible
+- **Adversarial debate is more valuable than consensus.** Single-agent analysis produces one narrative. The bull-bear debate with explicit convergence detection and unresolved disagreement tracking produces stress-tested analysis. The debate transcript is often more informative than the conclusion
+- **Monte Carlo with real correlations matters.** Portfolio risk isn't the sum of individual risks — correlation between holdings determines tail risk. Using the actual Yahoo Finance correlation matrix (not assumed independence) for 10,000 simulations produces VaR/CVaR numbers that account for diversification benefits (or concentration risks)
+- **Human checkpoints are structural, not decorative.** Making `humanDecisionRequired: true` a literal type on every verdict means it's impossible to accidentally omit. The pipeline uses LangGraph `interrupt()` — checkpoints are architectural, not optional UI elements
+- **"Do nothing" is the most important recommendation.** Most market events don't warrant action. Structurally requiring a baseline option with the cost of inaction forces the system to justify every recommendation against doing nothing — which is usually the right answer
+- **Eval methodology shaped the architecture.** Running 25 historical events with ground truth returns revealed that single-agent models score 0.0/5.0 on recommendations — they literally cannot produce them. This isn't a model quality issue; it's a structural limitation. The multi-agent architecture enables qualitatively different output, not just quantitatively better output
+
+### Tech I Used
+- **Frontend:** React 19, Vite 6, React Router 7, TypeScript, CSS
+- **Server:** Express.js 4, SSE streaming, session management
+- **Agents:** LangGraph (StateGraph, interrupt, MemorySaver), Gemini 3 Flash Preview, Google Search grounding
+- **Market Data:** Yahoo Finance API (prices, volatility, correlations), 24h TTL cache
+- **Calibration:** Monte Carlo simulation (10K runs), VaR/CVaR, sqrt-of-time scaling, volatility clamping
+- **Type Safety:** TypeScript 5.7, Zod 3.25, shared types package
+- **Infrastructure:** pnpm workspaces, Google Cloud Run, LangSmith observability
+- **Eval:** 25-event benchmark, LLM-as-judge (5 quality dimensions), 3-system comparison
+
+---
+
 ## ShowMe — Voice-First AI Educational Platform (GitHub: [chijunzheng/ShowMe](https://github.com/chijunzheng/ShowMe))
 
 ### The Situation — why I built it
@@ -237,9 +312,10 @@ order: 2
 - **Result: 88% benchmark accuracy (26 points above raw LLM, 10 above naive RAG). Presented to CTO, VP, and Director — systematic ablation evidence secured the production mandate**
 
 #### Phase 3: Production-Ready Platform Build on GCP (Team of 5)
-- Chose GCP for its AI capabilities and natural fit with Telus's Google Workspace workflows (Google Chat as primary interface)
+- Chose GCP for its AI capabilities and natural fit with Telus's existing cloud infrastructure
 - Google's managed RAG solution performed well in US region demo but was unusable in the Canadian region required by Telus data sovereignty policy — pivoted to building custom system with lower-level Google APIs
 - Built custom RAG pre-processing pipeline, Vertex AI Vector Search as vector database, and multi-agent orchestration via Google ADK (Agent Development Kit)
+- Initially shipped with Google Chat as the frontend for zero-adoption-friction — later replaced with a purpose-built web frontend when Chat's limitations became blockers (see "Custom Frontend" below)
 
 ##### Agentic Document Ingestion
 - Built agentic ingestion system processing 2,000+ documents from heterogeneous formats (PDF, DOCX, PPTX, XLSX, images) — Google Drive → GCS mirroring (10-min cron) → swarm-based parallel processing
@@ -262,17 +338,22 @@ order: 2
 - **Long-term memory:** Firestore vector database for semantic retrieval of past context; Cloud SQL for structured metadata queries
 - Context compacted via LLM summarization at 50% context window threshold — empirically tested as the optimal point before answer quality degrades
 
-##### Frontend via Google Chat
-- Google Chat bot integrated with backend API via Apps Script — all Telus employees already had access, zero adoption friction
-- Custom cards display agent reasoning: retrieved chunks, tool calls, agent decisions — providing transparency into how answers are generated
-- Thumbs up/down buttons with optional text feedback stored in Cloud SQL for continuous improvement loop
+##### Frontend Evolution: Google Chat → Custom Web Application
+- **V1 — Google Chat:** initial deployment as a Chat bot via Apps Script — zero adoption friction since all Telus employees already had access. Custom cards displayed agent reasoning (retrieved chunks, tool calls, decisions) with thumbs up/down feedback stored in Cloud SQL
+- **Why we outgrew Google Chat:** Chat's rigid card format couldn't render diagrams, graphs, or rich visual content from source documents. No support for multi-session management. No path to integrating dashboards for KPI visualization, performance trends, or configuration management. As the platform's scope expanded beyond Q&A, the interface became the bottleneck
+- **V2 — Custom Web Frontend:** designed and deployed a purpose-built web application with a Gemini/ChatGPT-style conversational UI — left sidebar for session management and navigation, center panel for main chat content with rich rendering
+- **Diagram and visual artifact retrieval:** during document ingestion, the VisualTranscriber agent extracts diagrams, flowcharts, and architecture images from source documents, saves them as separate artifacts on GCS with unique URIs, and embeds the GCS URI references directly into the text chunks. When retrieved chunks contain embedded diagram references, the frontend fetches the artifact from GCS and renders it inline alongside the text answer — supplementing explanations with the original visual context from the source document
+- **Knowledge base management UI:** users can browse every document ingested into the shared knowledge base, view document metadata and chunk breakdowns, and ingest new documents directly through the frontend — making the knowledge base a collaboratively maintained shared resource rather than a static corpus
+- **Authentication and access control:** Google Identity-Aware Proxy (IAP) configured at the load balancer layer — only authenticated Telus Google Workspace accounts can access the frontend, which connects to the backend API. Zero custom auth code; IAP handles OAuth flow, session tokens, and access enforcement
+- **Extensible platform architecture:** the custom frontend is designed as an extensible agentic platform, not a single-purpose chatbot. Future use cases planned on the same interface: KPI dashboard with performance trends and anomaly visualization, configuration management for RAN parameters, proactive root cause analysis agent surfacing issues before tickets are filed, and capacity planning tools — similar to how Google's app ecosystem serves many use cases from a unified platform
 
 ##### Observability & 4-Dimension Evaluation
-- Deployed Langfuse on a dedicated Cloud Run container for end-to-end tracing of every query
+- Initially deployed Langfuse on a dedicated Cloud Run container for end-to-end tracing of every query
 - Built automated evaluation pipeline: **Fact judge** (golden dataset by domain experts), **Retrieval judge** (LLM-generated query/chunk pairs), **Tool-call judge** (domain expert query/expected tool-call pairs), **Performance judge** (latency and cost vs. SLA)
 - Evaluation runs automatically on every Cloud Run deployment, with reports diffable against previous versions
+- Later evolved observability from Langfuse to a self-hosted LGTM stack (Loki, Grafana, Tempo, Mimir) with a custom ADK Telemetry Plugin and an AI-powered Observability Agent that investigates incidents via natural language — see the dedicated [Observability Agent project](#observability-agent) below for the full technical deep-dive
 
-- **Result: Production-ready agentic RAG platform completed by end of 2025, with pilot usage and planned rollout across 12 teams (400+ engineers). Reduced spec search time from 2 hours to 20 minutes per query. User dissatisfaction improved from 50% to 30% after 3 months of feedback-driven iteration**
+- **Result: Production-ready agentic RAG platform completed by end of 2025, with pilot usage and planned rollout across 12 teams (400+ engineers). Reduced spec search time from 2 hours to 20 minutes per query. User dissatisfaction improved from 50% to 30% after 3 months of feedback-driven iteration. Custom web frontend replaced Google Chat with rich diagram rendering, multi-session management, and knowledge base browsing — architected as an extensible agentic platform for future use cases (KPI dashboards, configuration management, proactive RCA)**
 
 ### The Result (Full Journey)
 - Accuracy progression: 62% (raw LLM) → 78% (naive RAG) → 88% (optimized) — a 42% relative improvement
@@ -290,13 +371,99 @@ order: 2
 - **Don't trust vendor promises blindly.** Google's managed RAG worked great in the US region demo but fell apart in the Canadian region we needed. Should have demanded a Canadian-region proof of concept before committing
 - **The ablation methodology was more valuable than any single technique.** Isolating each improvement independently built evidence-based decision making into the team's approach — and gave executives confidence in continued investment
 - **Observability should be day-one, not an afterthought.** We bolted on Langfuse after hitting production issues. If tracing had been there from the start, we'd have caught the context window degradation problem much earlier
+- **Google Chat was the right V1, but know when to graduate.** Zero-friction adoption got us early users and feedback fast. But Chat's rigid card format became the bottleneck the moment we needed to render diagrams from source documents, manage multiple sessions, or plan for dashboards. The lesson: ship on an existing platform to validate demand, but architect for the migration you'll inevitably need. We designed the backend API to be frontend-agnostic from day one, so swapping Google Chat for a custom web app was a backend-zero-change operation
+- **Visual artifacts in chunks changed answer quality.** Telecom specs are diagram-heavy — a text-only answer about an F1 interface architecture is incomplete without the reference diagram. Embedding GCS URIs directly into chunks during ingestion means retrieval automatically surfaces the right visuals. The frontend just needed to fetch and render them — the intelligence is in the ingestion pipeline, not the UI
 - **Leading juniors slowed me down at first, but 10x'd the outcome.** My instinct was to build everything myself. But investing in the team meant we could parallelize pipeline, evaluation, and frontend work. The 4 engineers I mentored now own AI system components independently
 
 ### Tech I Used
 - **Phase 1:** Python, FastAPI, Uvicorn, Pydantic, Streamlit, Google GenAI API, Vertex AI Vector Search, PyPDF, python-docx
 - **Phase 2:** PyTorch, Qwen-3-8B, H100 GPU, 8-bit quantization, Rank-BM25, contrastive learning, ORAN benchmark
-- **Phase 3:** Google ADK, Cloud Run, Cloud Build, Cloud SQL (MySQL), Firestore, Cloud Storage, Cloud Tasks, Cloud Scheduler, BigQuery, Google Chat, Apps Script, Langfuse, OpenTelemetry
+- **Phase 3:** Google ADK, Cloud Run, Cloud Build, Cloud SQL (MySQL), Firestore, Cloud Storage, Cloud Tasks, Cloud Scheduler, BigQuery, Google Identity-Aware Proxy (IAP), Langfuse, OpenTelemetry, self-hosted LGTM stack (Grafana, Loki, Tempo, Mimir), PromQL, LogQL, TraceQL
+- **Frontend (V1):** Google Chat, Apps Script | **(V2):** Custom web application (Gemini/ChatGPT-style UI), Google IAP authentication
 - **Tools:** Docker, Git, GitHub, GitLab, uv, Jupyter Notebook, Claude Code
+
+---
+
+## AI-Powered Observability Agent for the LGTM Stack {#observability-agent}
+
+### The Situation — why I built it
+- The agentic copilot serving 400+ engineers was instrumented with Langfuse, but production debugging still required manually searching Tempo traces, writing LogQL queries in Loki, cross-referencing Grafana dashboards, and piecing together the story across multiple tabs — 10-15 minutes per investigation for an experienced developer
+- No existing tool could correlate signals across all three observability backends (traces, logs, metrics) through natural language — developers needed to know PromQL, LogQL, and TraceQL to investigate incidents
+- Goal: build an AI agent that lets developers investigate production incidents through conversation, autonomously querying the LGTM stack and correlating evidence across backends — and measure its quality rigorously with an eval framework
+
+### What I Did
+
+#### Self-Hosted LGTM Stack Deployment
+- Deployed the full Grafana LGTM stack on a GCE VM (e2-standard-4, Container-Optimized OS) running Docker Compose with 5 containers: OpenTelemetry Collector (OTLP on gRPC/HTTP), Tempo for traces, Loki for logs, Mimir for metrics, and Grafana for dashboards
+- OTel Collector acts as the single ingestion point — receives all telemetry from Cloud Run via Direct VPC Egress and routes to appropriate backends: traces to Tempo via OTLP, metrics to Mimir via Prometheus Remote Write, logs to Loki via push API
+- Each backend stores data in dedicated GCS buckets (`nexus-observability-tempo`, `nexus-observability-loki`, `nexus-observability-mimir`) with local volumes only for WAL and index caches; Tempo retains 30 days of traces
+- VM has no external IP — Cloud NAT for outbound, IAP-protected HTTPS load balancer (Google-managed SSL via sslip.io) for authenticated Grafana access
+- Automated entire deployment via a single idempotent script (`deploy-gce.sh`): GCS bucket creation, firewall rules, config upload, VM provisioning with startup script, Cloud Run env var updates, and load balancer setup
+- Pre-provisioned Grafana with all 3 datasources and 12 dashboards covering: request overview, LLM metrics, token cost tracking, error rates, trace exploration, log exploration, retrieval metrics, and eval results
+
+#### Custom ADK Telemetry Plugin (OpenTelemetry Instrumentation)
+- Built a custom `NexusTelemetryPlugin` that hooks into Google ADK's lifecycle callbacks to instrument every boundary in the agent's execution — every new agent or tool automatically inherits full observability without additional code
+- **Agent spans** (`before_agent`/`after_agent`): wraps full agent invocations, capturing agent name and session ID
+- **LLM metrics** (`before_model`/`after_model`): records model name, call latency, token usage (input/output), estimated cost in USD, and model errors
+- **Tool spans** (`before_tool`/`after_tool`): wraps each tool call, capturing tool name, execution time, retrieved document count, and tool errors
+- AI-specific OTel metrics: `nexus.llm.duration` (histogram), `nexus.token.input/output` (counter), `nexus.cost.estimated` (counter), `nexus.tool.duration` (histogram), `nexus.retrieval.doc_count` (histogram), `nexus.error.count` (counter), `nexus.request.duration` (histogram)
+- Dual-export configuration: traces, logs, and metrics flow to both the self-hosted LGTM stack AND Google Cloud (Cloud Trace, Cloud Logging) simultaneously — same telemetry powers both the agent's investigations and the team's existing GCP workflows
+- All telemetry operations wrapped in defensive error handling — if OTel is unavailable, instrumentation degrades to safe no-ops without impacting agent execution
+- Handled ADK's async generator context corruption bug by patching OTel's context detach mechanism and using ContextVars for reliable log correlation
+- Structured logging via `google.cloud.logging.StructuredLogHandler` with automatic trace/span ID injection for seamless log-to-trace navigation in both Cloud Logging and Grafana
+
+#### 4-Agent Pipeline Architecture
+- **Agent 1 — Intent Classifier:** lightweight routing via gemini-2.5-flash-lite, classifies into 7 categories (latency, failure, cost, eval, query generation, comparison, exploration) using intent definitions with boundary cases and 12 few-shot examples; keyword pre-filter provides fast-path routing for unambiguous patterns without an LLM call
+- **Agent 2 — Investigation Planner:** reasoning-capable LLM (gemini-3-flash) calls all three backend discovery tools (Mimir metrics list, Loki label list, Tempo tag list) in parallel to verify what data actually exists before planning; query hints contain real metric names instead of guesses; produces tool allowlist with softer constraints for ambiguous intents
+- **Agent 3 — Investigator:** pure evidence gatherer (gemini-3-flash, 25-iteration ReAct budget); explicit system prompt: "Your sole job is gathering evidence. A synthesis agent will write the final answer." Receives plan + query hints from planner, accesses 4 query tools, outputs raw evidence items; no synthesis pressure means full budget on following up empty results and cross-referencing signals
+- **Agent 4 — Synthesizer:** single LLM call, no tools, always runs even if investigator exhausted budget early; receives all evidence + original question, produces structured answer (Finding, Evidence, Analysis, Next Steps) with anti-hallucination directive ("Base ONLY on provided evidence")
+- Cross-signal correlation step before ReAct loop: given a trace ID, service name, or time window, fans out to Tempo, Loki, and Mimir in parallel via `asyncio.gather`, merging evidence into a single context block — connects *what happened* (traces) with *what the system was thinking* (logs) and *how it was performing* (metrics) without spending ReAct iterations on fan-out
+- Sessions persisted in Cloud SQL for multi-turn follow-up investigations
+
+#### Four LGTM Query Tools
+- `tool_query_tempo`: search traces by service, operation, duration, and tags; fetch full trace details; list available tags and values
+- `tool_query_loki`: execute LogQL range and instant queries; list labels and label values; filter by service, level, agent, and event
+- `tool_query_mimir`: execute PromQL instant and range queries; list metrics and series; fetch metric metadata
+- `tool_generate_query`: translate natural language into PromQL, LogQL, or TraceQL; returns query for developer review before execution — never blindly runs unbounded queries
+
+#### Eval-Driven Architecture Iteration (V1 → V3)
+- Built a formal evaluation framework: 50 curated questions across 6 intent categories, scored by an LLM-as-judge (Gemini) on 6 dimensions: intent accuracy, source selection, tool coverage, query correctness, answer quality, and composite score
+- **Raw LLM baseline (0.371 composite):** established the floor — zero tool coverage, zero query correctness, 0.5 answer quality (plausible-sounding but fabricated answers)
+- **V1 — Pure ReAct (0.731):** standard ReAct loop with all 4 tools always available; agent improvises entire investigation plan; keyword-based intent classification misroutes ambiguous questions; improvised PromQL has wrong syntax; prompt engineering couldn't fix the architecture
+- **V2 — Quasi-Agentic Pipeline (0.797, +9.1%):** added deterministic stages around single ReAct agent: LLM intent classifier with definitions + few-shot, planner with backend routing + tool allowlist, 17 validated PromQL/LogQL templates, pre-execution front-loading; source selection jumped to 0.907, intent accuracy to 0.940; BUT hit hard ceiling at ~0.80 — single agent exhausted 6-call budget on tool calls in 62% of questions, falling back to deterministic template (scored 0.5 on answer quality)
+- **V3 — 4-Agent Pipeline (0.882, +20.7%):** broke single-agent architecture into 4 specialized agents; template-fallback rate dropped from 62% to 0%; answer quality jumped from 0.638 to 0.833 (+30.8%) — largest single-dimension gain in entire evolution
+- Ran ablation study removing each agent individually: intent classifier is the keystone (−0.328 composite without it — cascade failure), planner discovery has real value (−0.118), synthesizer is structurally important (−0.017)
+
+#### Grafana Integration
+- Embedded the Observability Agent directly into Grafana as an iframe panel in the Copilot dashboard — developers never leave Grafana to investigate incidents
+- The iframe calls the agent's Cloud Run API, which queries the same LGTM backends that power the surrounding dashboards — no separate data pipeline or context switch
+- The agent is self-observable: it exports its own telemetry back into the LGTM stack, so you can trace the agent investigating its own traces
+
+### The Result
+- Achieved 0.882 composite score on 50-question benchmark, +20.7% over single-agent baseline and +137.7% over raw LLM (0.371)
+- Answer quality improved from 0.637 (V1) to 0.833 (V3), a +30.8% gain driven entirely by separating evidence gathering from synthesis
+- Eliminated template-fallback problem: 0% template fallback in V3 vs. 62% in V2
+- Reduced incident investigation time from 10-15 minutes of manual PromQL/LogQL/TraceQL authoring and dashboard-switching to under 30 seconds via natural language
+- Used daily by 8-person development team to debug, optimize, and operate the agentic copilot platform
+- Token cost tracking by model/agent identified one sub-agent consuming 40% of total LLM budget — led to a model swap that cut costs without impacting quality
+- Tool duration histograms surfaced a retrieval timeout causing 15% of requests to fall back to sequential execution
+- 12 pre-provisioned Grafana dashboards provide real-time visibility into request rate, P95 latency, success rate, tokens/s, cost rate, and error distribution
+
+### Real Talk
+- **Eval-driven development works, but question-level analysis matters more than aggregate scores.** The composite score going up is nice, but the real insight came from examining individual questions that failed: the "30-second request" question that got misclassified as "failure" instead of "latency" revealed the entire classifier-as-keystone dynamic. Aggregate metrics hide the most instructive failures
+- **The budget ceiling was the most important finding.** V1 to V2 improved every process metric (intent, source selection, tool coverage) but answer quality stayed flat at 0.638. Without the eval framework, we would have thought V2 was working well. The eval revealed that the single-agent architecture had a structural ceiling — no amount of prompt engineering could fix it
+- **Separation of concerns is an architecture principle, not just a code organization principle.** When I split the single ReAct agent into 4 agents, each with a focused prompt and its own tool set, every agent got better at its job. The investigator uses all 25 iterations for evidence because it doesn't worry about writing a nice answer. The synthesizer always runs because it has no tool budget to exhaust
+- **Self-hosting the LGTM stack was the right call.** I needed the agent to query Tempo, Loki, and Mimir via HTTP APIs — not just view dashboards. That means direct access to the backends, which Grafana Cloud would have added complexity to (authentication, API gateway, network routing). Self-hosting on a single VM with Docker Compose keeps the architecture simple and the latency low
+- **Instrument at the framework level, not the application level.** By hooking into ADK's lifecycle callbacks, every new agent or tool automatically gets full observability. We never have to remember to add tracing to a new component — it's inherited. This is the only sustainable approach for a system where agents and tools change frequently
+- **The observability agent investigating its own traces is genuinely useful.** When the agent itself is slow, developers can ask it "why was the last observability query slow?" and it traces its own execution. Self-referential debugging sounds like a gimmick but actually closes the feedback loop
+
+### Tech I Used
+- **Observability Stack:** Grafana, Loki, Tempo, Mimir, OpenTelemetry (Python SDK, OTLP gRPC/HTTP exporters), PromQL, LogQL, TraceQL, Google Cloud Trace, Google Cloud Logging
+- **AI/Agent:** Google ADK (Agent Development Kit), Gemini 2.5 Flash Lite, Gemini 3 Flash, custom ADK telemetry plugin, ReAct agents, multi-agent pipeline
+- **Infrastructure:** Docker Compose, GCE (Container-Optimized OS), GCS, Cloud NAT, IAP-protected HTTPS load balancer, Cloud Run (agent API), Cloud SQL (session persistence)
+- **Evaluation:** LLM-as-judge (Gemini), 50-question curated benchmark, 6-dimension scoring, ablation study framework
+- **Backend:** Python, FastAPI, asyncio, aiohttp
+- **Tools:** Docker, Git, GitHub, uv, Claude Code
 
 ---
 

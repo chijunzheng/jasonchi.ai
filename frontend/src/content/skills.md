@@ -21,7 +21,7 @@ pytorch, langchain, llamaindex
 GCP, AWS 
 
 ### Tools
-Docker, Kubernetes, Terraform, CI/CD, cloud run, cloud build, cloud functions, cloud scheduler, cloud pub/sub, cloud storage, cloud sql, cloud spanner, cloud bigtable, big query, cloudsql, IAM, cloud monitoring, cloud logging, cloud trace, JIRA, Confluence, Git, GitHub, GitLab, uv, Jupyter Notebook, claude code, gemini-cli, codex, cline, cursor, antigravity
+Docker, Docker Compose, Kubernetes, Terraform, CI/CD, cloud run, cloud build, cloud functions, cloud scheduler, cloud pub/sub, cloud storage, cloud sql, cloud spanner, cloud bigtable, big query, cloudsql, IAM, cloud monitoring, cloud logging, cloud trace, Grafana, Loki, Tempo, Mimir, OpenTelemetry Collector, JIRA, Confluence, Git, GitHub, GitLab, uv, Jupyter Notebook, claude code, gemini-cli, codex, cline, cursor, antigravity
 
 ## AI & Machine Learning
 
@@ -35,7 +35,8 @@ Claude code, Codex, gemini-cli, pytorch, Hugging face, milvus, pinecone, weaviat
 - **RAG systems:** End-to-end pipeline design — chunking strategies, hybrid retrieval, contextual chunking, multi-granularity indexing, corrective re-retrieval
 - **Fine-tuning:** Continual pre-training (LLM), contrastive learning (embeddings), ablation-driven evaluation
 - **Evaluation:** LLM-as-judge, multi-dimension automated eval pipelines, shadow A/B testing, benchmark-driven development
-- **Guardrails & observability:** Langfuse tracing, context window management, graceful degradation patterns
+- **Observability & telemetry:** Self-hosted LGTM stack (Grafana, Loki, Tempo, Mimir), OpenTelemetry (Python SDK, OTLP gRPC/HTTP exporters, dual-export configurations), PromQL, LogQL, TraceQL, custom ADK telemetry plugins (lifecycle callback instrumentation), AI-specific metrics (LLM duration, token consumption, cost estimation, tool latency), Grafana dashboard provisioning, Langfuse tracing, Google Cloud Trace, Google Cloud Logging, distributed trace correlation, structured JSON logging with trace/span ID injection
+- **Guardrails & reliability:** context window management, graceful degradation patterns, anti-hallucination directives, defensive telemetry (safe no-ops when OTel unavailable)
 - **Data processing & pipelines:** Agentic document ingestion (5,000+ docs, swarm-based parallel processing), dual-path Splunk KPI ETL (HEC push + 15-min Search API pull), Samsung-primary on-prem multi-server config ETL to centralized BigQuery, raw->staging->curated modeling with GCS landing, SCD Type 2 + current-state dimension design, Cloud Tasks orchestration, data quality gates (completeness/duplicates/referential/freshness), idempotent processing with state tracking (Firestore ledger)
 
 ## Soft Skills

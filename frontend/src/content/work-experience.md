@@ -156,13 +156,32 @@ order: 1
 - Thumbs up/down buttons with optional text feedback stored in Cloud SQL for continuous improvement loop
 
 #### Observability & Evaluation
-- Deployed Langfuse on a dedicated Cloud Run container for end-to-end tracing of every query — ADK lacks native observability, so open-source was the pragmatic choice
+- Built structured tracing and telemetry using OpenTelemetry (OTel) to observe agent traces end-to-end — captured the full lifecycle of each query including LLM thinking process, tool calls, errors, latency, and cost — ADK lacks native observability, so custom instrumentation was necessary
+- Later migrated to Langfuse (deployed on a dedicated Cloud Run container) as it provided a more complete open-source package: observability, metrics, prompt management, and evaluation in one platform — replacing the need to stitch together separate OTel + custom tooling
+- Built a custom developer dashboard for viewing live user feedback and comments — each feedback entry linked directly to the corresponding query's telemetry in both GCP Cloud Logging and Langfuse, enabling one-click drill-down from user complaint to full execution trace
 - Built 4-dimension automated evaluation pipeline:
   - **Fact judge** — curated golden dataset by domain experts
   - **Retrieval judge** — LLM-generated query/chunk pairs
   - **Tool-call judge** — domain expert query/expected tool-call pairs
   - **Performance judge** — latency and cost vs. engineering SLA
 - Evaluation runs automatically on every Cloud Run deployment, with reports diffable against previous versions to catch regressions before users
+
+#### Self-Hosted LGTM Stack & AI-Powered Observability Agent
+- After identifying limitations with Langfuse for production-scale observability (no cross-signal correlation, no natural-language investigation, no PromQL/LogQL/TraceQL generation), built a self-hosted LGTM stack (Loki, Grafana, Tempo, Mimir) and an AI-powered Observability Agent
+- Deployed the full LGTM stack on a GCE VM (e2-standard-4, Container-Optimized OS) running Docker Compose — OpenTelemetry Collector as single ingestion point, Tempo for traces, Loki for logs, Mimir for metrics, Grafana for dashboards, all backed by GCS buckets for durability (30-day trace retention)
+- Built a custom `NexusTelemetryPlugin` hooking into ADK's lifecycle callbacks (`before_agent`, `after_agent`, `before_model`, `after_model`, `before_tool`, `after_tool`, plus error handlers) to emit AI-specific OTel metrics: LLM call duration, token consumption by model/agent, estimated cost in USD, tool execution latency, retrieval document counts, and error rates by type
+- Configured dual-export OpenTelemetry: traces, logs, and metrics flow simultaneously to both the self-hosted LGTM stack (for agent investigation) and Google Cloud (Cloud Trace, Cloud Logging) for production monitoring — same telemetry powers both the observability agent's investigations and the team's existing GCP workflows
+- Built an AI-powered Observability Agent using Google ADK with Gemini, embedded directly into Grafana as an iframe panel — developers investigate incidents through natural language without writing PromQL, LogQL, or TraceQL
+- Architected a 4-agent pipeline: **Intent Classifier** (gemini-2.5-flash-lite, 7 categories, keyword fast-path), **Investigation Planner** (gemini-3-flash, parallel backend discovery before planning), **Investigator** (25-iteration ReAct agent, pure evidence gathering, no synthesis pressure), **Synthesizer** (single LLM call, always runs, structured output with anti-hallucination directive)
+- Built 4 specialized LGTM query tools: Tempo trace search (by service, operation, duration, tags), Loki log queries (LogQL range/instant with label filtering), Mimir metric queries (PromQL instant/range with series listing), and natural-language-to-query translator (generates PromQL/LogQL/TraceQL for developer review before execution)
+- Cross-signal correlation: given a trace ID, service name, or time window, fans out to Tempo, Loki, and Mimir in parallel via `asyncio.gather`, merging evidence into a single context block — connects *what happened* (traces) with *what the system was thinking* (logs) and *how it was performing* (metrics) without spending ReAct iterations on fan-out
+- Eval-driven architecture iteration through 3 versions on a 50-question benchmark with LLM-as-judge scoring across 6 dimensions: V1 Pure ReAct (0.731) → V2 Quasi-Agentic Pipeline (0.797, +9.1%) → V3 4-Agent Pipeline (0.882, +20.7%) — each iteration driven by question-level failure analysis from the previous eval
+- Key finding: separation of evidence gathering from synthesis broke the "budget ceiling" — V2's single agent exhausted its 6-call budget on tool calls 62% of the time, falling back to template answers; V3's dedicated investigator (25 iterations) and dedicated synthesizer eliminated template fallback entirely, driving answer quality from 0.638 to 0.833 (+30.8%)
+- Ablation study on the full benchmark proved intent classification as the keystone agent (removing it drops composite by −0.328), planner discovery as real value (−0.118 without it), and synthesizer separation as a structural improvement (−0.017)
+- Reduced incident investigation time from 10-15 minutes of manual dashboard-switching to under 30 seconds via natural language
+- Pre-provisioned Grafana with 12 dashboards: request overview, LLM metrics, token cost tracking, error rates, trace exploration, log exploration, retrieval metrics, and eval results
+- Automated the entire LGTM deployment via a single idempotent script: GCS bucket creation, firewall rules, VM provisioning with startup script, Cloud Run env var updates with internal IP, and IAP-protected HTTPS load balancer setup
+- The observability agent is self-observable: it exports its own telemetry back into the LGTM stack, so you can trace the agent investigating its own traces
 
 #### AI Literacy & Developer Enablement
 - Taught foundational AI concepts (how LLMs, RAG, and agents work) to RAN domain experts who had no prior AI background — this was a strategic investment because the project depended on their domain knowledge for curating training data, evaluating retrieval quality, and defining golden datasets
@@ -205,7 +224,7 @@ order: 1
 - **Cloud:** Google Cloud Run, Cloud Build, Cloud SQL (MySQL), Cloud Firestore, Google Cloud Storage, Google Cloud Tasks, Cloud Scheduler, Google Cloud Trace, Google Cloud Logging
 - **Data Processing:** BigQuery (ETL pipelines, KPI analytics), Cloud Tasks (async job orchestration), batch embedding APIs, asyncio concurrency controls
 - **Frontend:** Google Chat, Google Apps Script, Google Sheets API, Streamlit
-- **Observability:** Langfuse, OpenTelemetry, Looker, BigQuery, Data Studio
+- **Observability:** Self-hosted LGTM stack (Grafana, Loki, Tempo, Mimir), OpenTelemetry (Python SDK, OTLP exporters, dual-export to LGTM + GCP), PromQL, LogQL, TraceQL, Langfuse, Google Cloud Trace, Google Cloud Logging, Looker, BigQuery
 - **Data Processing:** BeautifulSoup4, PyPDF, python-docx, python-pptx, Pillow, pdf2image, Openpyxl, Tabulate
 - **Tools:** Docker, Git, GitHub, GitLab, uv, Jupyter Notebook
 
