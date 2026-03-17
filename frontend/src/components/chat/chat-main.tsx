@@ -56,10 +56,16 @@ export function ChatMain({
 }: ChatMainProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [overviewOpen, setOverviewOpen] = useState(false)
+  const [isDownloadingTailoredResume, setIsDownloadingTailoredResume] = useState(false)
+  const [tailoredResumeError, setTailoredResumeError] = useState<string | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
+
+  useEffect(() => {
+    setTailoredResumeError(null)
+  }, [jdContext?.jobDescription])
 
   const lastAssistantMessage = [...messages]
     .reverse()
@@ -74,8 +80,57 @@ export function ChatMain({
     ? activeCategory.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : 'Chat'
 
-  const handleTailoredResumeDownload = () => {
-    trackEvent('resume_downloaded', { context: 'tailored' })
+  const handleTailoredResumeDownload = async () => {
+    if (!jdContext || isDownloadingTailoredResume) return
+
+    setTailoredResumeError(null)
+    setIsDownloadingTailoredResume(true)
+    try {
+      const response = await fetch('/api/tailored-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobDescription: jdContext.jobDescription,
+          analysis: jdContext.analysis,
+        }),
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(
+          payload?.error ?? 'Failed to generate tailored resume.',
+        )
+      }
+
+      const contentDisposition = response.headers.get('content-disposition') ?? ''
+      const fileNameMatch = contentDisposition.match(/filename=\"?([^"]+)\"?/)
+      const fileName = fileNameMatch?.[1]?.trim() || 'jason-chi-tailored-resume.pdf'
+
+      const blob = await response.blob()
+      if (!blob.size) {
+        throw new Error('Generated resume file was empty. Please retry.')
+      }
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+
+      trackEvent('resume_downloaded', {
+        context: 'tailored',
+        matchLevel: jdContext.analysis.matchLevel,
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate tailored resume.'
+      setTailoredResumeError(message)
+    } finally {
+      setIsDownloadingTailoredResume(false)
+    }
   }
 
   return (
@@ -128,20 +183,21 @@ export function ChatMain({
           {jdContext && (
             <>
               <Button
-                asChild
                 variant="outline"
                 size="sm"
                 className="hero-subsurface gap-1.5 rounded-full px-2.5 text-xs font-semibold sm:px-3"
+                onClick={handleTailoredResumeDownload}
+                disabled={isDownloadingTailoredResume}
               >
-                <a
-                  href="/resume.pdf"
-                  download="jason-chi-tailored-resume.pdf"
-                  onClick={handleTailoredResumeDownload}
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Download Tailored Resume</span>
-                  <span className="sm:hidden">Tailored Resume</span>
-                </a>
+                <FileDown className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">
+                  {isDownloadingTailoredResume
+                    ? 'Generating Tailored Resume...'
+                    : 'Download Tailored Resume'}
+                </span>
+                <span className="sm:hidden">
+                  {isDownloadingTailoredResume ? 'Generating...' : 'Tailored Resume'}
+                </span>
               </Button>
               <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                 <FileSearch className="h-3 w-3" />
@@ -154,6 +210,11 @@ export function ChatMain({
                   <X className="h-3 w-3" />
                 </button>
               </span>
+              {tailoredResumeError && (
+                <span className="hidden text-xs text-destructive md:inline">
+                  {tailoredResumeError}
+                </span>
+              )}
             </>
           )}
         </div>

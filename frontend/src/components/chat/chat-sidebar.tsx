@@ -65,7 +65,7 @@ export function ChatSidebar({
         } fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r bg-sidebar transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0`}
       >
         {/* Profile header */}
-        <div className="flex items-center gap-3 border-b p-4">
+        <div className="flex h-14 items-center gap-3 border-b px-4">
           <AvatarWithStatus size="sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{SITE_CONFIG.name}</p>

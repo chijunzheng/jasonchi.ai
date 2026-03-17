@@ -18,7 +18,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from config import settings
+from config import gemini_release, gemini_throttle, settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +39,7 @@ from graph.builder import app_graph
 from graph.nodes.qa import stream_fast_path_events, stream_reflective_events
 from graph.state import GraphState
 from graph.tools.content_index import get_content_index
+from llm_factory import make_chat_llm
 from prompts.templates import CATEGORY_INSTRUCTIONS
 
 load_dotenv()
@@ -59,10 +60,14 @@ app.add_middleware(
 )
 
 
+_index_ready = asyncio.Event()
+
+
 @app.on_event("startup")
 async def _startup_prewarm() -> None:
     """Best-effort background warm-up for expensive singleton indexes."""
     if not settings.prewarm_content_index:
+        _index_ready.set()
         return
 
     async def _prewarm_content_index() -> None:
@@ -73,6 +78,8 @@ async def _startup_prewarm() -> None:
             logger.info("Startup prewarm complete: content index ready in %.0fms", elapsed)
         except Exception:
             logger.exception("Startup prewarm failed (non-fatal)")
+        finally:
+            _index_ready.set()
 
     asyncio.create_task(_prewarm_content_index())
 
@@ -332,6 +339,11 @@ class CoverLetterRequest(BaseModel):
     roleTitle: str | None = None
 
 
+class TailoredResumeRequest(BaseModel):
+    jobDescription: str = Field(min_length=50, max_length=10000)
+    analysis: dict
+
+
 class SessionSummaryRequest(BaseModel):
     messages: list[dict] = Field(min_length=3, max_length=50)
 
@@ -399,6 +411,74 @@ async def _resolve_jd_analysis_input(request: Request) -> str:
     payload = await request.json()
     parsed = JDAnalysisRequest.model_validate(payload)
     return parsed.jobDescription.strip()
+
+
+def _tailored_resume_prompt(
+    resume_content: str,
+    job_description: str,
+    analysis: dict,
+) -> str:
+    strengths = analysis.get("strengths", [])
+    gaps = analysis.get("gaps", [])
+    angle = analysis.get("angle", "")
+
+    strengths_text = "; ".join(s for s in strengths if isinstance(s, str)) or "N/A"
+    gaps_text = "; ".join(g for g in gaps if isinstance(g, str)) or "N/A"
+    angle_text = angle if isinstance(angle, str) and angle.strip() else "N/A"
+
+    return f"""Rewrite Jason Chi's resume so it is tightly tailored to this specific job description.
+
+## Hard Constraints (critical)
+- Use ONLY experiences, projects, skills, and facts that appear in Resume Content.
+- NEVER invent companies, titles, dates, metrics, or technologies.
+- If a JD requirement is not directly covered, do not fabricate coverage.
+- Keep production-confidential code references private (state "Internal TELUS (confidential/NDA)" when needed).
+
+## Output Format
+- Return markdown only (no code fences).
+- Keep it ATS-friendly and concise.
+- Include sections in this order:
+  1) # Jason Chi
+  2) ## Summary
+  3) ## Experience
+  4) ## Projects
+  5) ## Skills
+  6) ## Education
+- Use bullets for accomplishments and technical outcomes.
+- Prioritize content most relevant to the JD.
+
+## Tailoring Inputs
+Strengths: {strengths_text}
+Gaps: {gaps_text}
+Positioning Angle: {angle_text}
+
+## Job Description
+{job_description}
+
+## Resume Content
+{resume_content}
+
+Write the tailored resume now."""
+
+
+def _extract_llm_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+            else:
+                text = getattr(item, "text", None)
+                if isinstance(text, str):
+                    parts.append(text)
+        return "".join(parts)
+    return ""
 
 
 # ---------- Endpoints ----------
@@ -575,6 +655,13 @@ async def analyze_jd(request: Request):
             headers={"X-RateLimit-Remaining": str(remaining)},
         )
 
+    if not _index_ready.is_set():
+        return JSONResponse(
+            {"error": "Service is warming up. Please try again in a few seconds."},
+            status_code=503,
+            headers={"Retry-After": "5", "X-RateLimit-Remaining": str(remaining)},
+        )
+
     initial_state = GraphState(
         intent="jd_analysis",
         job_description=job_description,
@@ -582,7 +669,10 @@ async def analyze_jd(request: Request):
 
     try:
         logger.info("JD analysis request: %d chars", len(job_description))
-        result = await app_graph.ainvoke(initial_state)
+        result = await asyncio.wait_for(
+            app_graph.ainvoke(initial_state),
+            timeout=120,
+        )
         state = GraphState(**result) if isinstance(result, dict) else result
 
         response_body = dict(state.analysis_result or {})
@@ -594,6 +684,16 @@ async def analyze_jd(request: Request):
             response_body,
             headers={"X-RateLimit-Remaining": str(remaining)},
         )
+    except asyncio.TimeoutError:
+        logger.error("JD analysis timed out after 120s")
+        return JSONResponse(
+            {"error": "Analysis took too long. Please try again."},
+            status_code=504,
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
+    except asyncio.CancelledError:
+        logger.warning("JD analysis cancelled (client disconnected)")
+        raise
     except json.JSONDecodeError:
         logger.exception("JD analysis JSON decode error")
         return JSONResponse(
@@ -653,6 +753,57 @@ async def cover_letter(body: CoverLetterRequest, request: Request):
             "X-RateLimit-Remaining": str(remaining),
         },
     )
+
+
+@app.post("/api/tailored-resume")
+async def tailored_resume(body: TailoredResumeRequest, request: Request):
+    ip = _get_client_ip(request)
+    allowed, remaining = _check_rate_limit(ip)
+    if not allowed:
+        return JSONResponse(
+            {"error": "Too many requests. Please wait a moment."},
+            status_code=429,
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
+
+    try:
+        index = await get_content_index()
+        resume_content = index.get_full_category(
+            ["work-experience", "projects", "skills", "education"],
+        )
+        prompt = _tailored_resume_prompt(
+            resume_content=resume_content,
+            job_description=body.jobDescription,
+            analysis=body.analysis,
+        )
+
+        llm = make_chat_llm()
+        await gemini_throttle()
+        try:
+            result = await llm.ainvoke(prompt)
+        finally:
+            gemini_release()
+
+        resume_text = _extract_llm_text(result.content).strip()
+        if not resume_text:
+            return JSONResponse(
+                {"error": "Failed to generate tailored resume."},
+                status_code=502,
+                headers={"X-RateLimit-Remaining": str(remaining)},
+            )
+
+        file_name = f"jason-chi-tailored-resume-{time.strftime('%Y%m%d')}.md"
+        return JSONResponse(
+            {"resumeText": resume_text, "fileName": file_name},
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
+    except Exception:
+        logger.exception("Tailored resume generation failed")
+        return JSONResponse(
+            {"error": "Failed to generate tailored resume."},
+            status_code=500,
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
 
 
 @app.post("/api/session-summary")

@@ -179,3 +179,43 @@ ${jobDescription}
 
 Write the cover letter now. Use plain paragraphs — no bullet points or section headers for this one.`
 }
+
+export function buildTailoredResumePrompt(
+  resumeContent: string,
+  jobDescription: string,
+  analysis: { strengths: string[]; gaps: string[]; angle: string },
+): string {
+  return `Rewrite Jason Chi's resume so it is tightly tailored to this specific job description.
+
+## Hard Constraints (critical)
+- Use ONLY experiences, projects, skills, and facts that appear in Resume Content.
+- NEVER invent companies, titles, dates, metrics, or technologies.
+- If a JD requirement is not directly covered, do not fabricate coverage.
+- Keep production-confidential code references private (state "Internal TELUS (confidential/NDA)" when needed).
+
+## Output Format
+- Return markdown only (no code fences).
+- Keep it ATS-friendly and concise.
+- Include sections in this order:
+  1) # Jason Chi
+  2) ## Summary
+  3) ## Experience
+  4) ## Projects
+  5) ## Skills
+  6) ## Education
+- Use bullets for accomplishments and technical outcomes.
+- Prioritize content most relevant to the JD.
+
+## Tailoring Inputs
+Strengths: ${analysis.strengths.join('; ')}
+Gaps: ${analysis.gaps.join('; ')}
+Positioning Angle: ${analysis.angle}
+
+## Job Description
+${jobDescription}
+
+## Resume Content
+${resumeContent}
+
+Write the tailored resume now.`
+}

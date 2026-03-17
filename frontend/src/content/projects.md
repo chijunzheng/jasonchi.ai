@@ -347,11 +347,12 @@ order: 2
 - **Authentication and access control:** Google Identity-Aware Proxy (IAP) configured at the load balancer layer — only authenticated Telus Google Workspace accounts can access the frontend, which connects to the backend API. Zero custom auth code; IAP handles OAuth flow, session tokens, and access enforcement
 - **Extensible platform architecture:** the custom frontend is designed as an extensible agentic platform, not a single-purpose chatbot. Future use cases planned on the same interface: KPI dashboard with performance trends and anomaly visualization, configuration management for RAN parameters, proactive root cause analysis agent surfacing issues before tickets are filed, and capacity planning tools — similar to how Google's app ecosystem serves many use cases from a unified platform
 
-##### Observability & 4-Dimension Evaluation
-- Initially deployed Langfuse on a dedicated Cloud Run container for end-to-end tracing of every query
+##### Observability (3 Iterations) & 4-Dimension Evaluation
+- **V1 — Custom OTel:** Built structured tracing using OpenTelemetry to capture the full agent lifecycle (LLM thinking, tool calls, errors, latency, cost). Functional but required manual log correlation across separate tools
+- **V2 — Langfuse:** Migrated to Langfuse (dedicated Cloud Run container) for unified observability, metrics, prompt management, and evaluation. Served well for prompt iteration and eval, but hit production-scale limitations: no cross-signal correlation, no natural-language investigation, no PromQL/LogQL/TraceQL generation
+- **V3 — Self-hosted LGTM stack + AI Observability Agent (current):** Evolved past Langfuse by self-hosting the full Grafana LGTM stack (Loki, Grafana, Tempo, Mimir) with a custom ADK Telemetry Plugin, then built an AI-powered Observability Agent that investigates incidents via natural language — built rapidly using Claude Code with eval-driven iteration (3 architecture versions, 0.882 composite on 50-question benchmark). See the dedicated [Observability Agent project](#observability-agent) below for the full technical deep-dive
 - Built automated evaluation pipeline: **Fact judge** (golden dataset by domain experts), **Retrieval judge** (LLM-generated query/chunk pairs), **Tool-call judge** (domain expert query/expected tool-call pairs), **Performance judge** (latency and cost vs. SLA)
 - Evaluation runs automatically on every Cloud Run deployment, with reports diffable against previous versions
-- Later evolved observability from Langfuse to a self-hosted LGTM stack (Loki, Grafana, Tempo, Mimir) with a custom ADK Telemetry Plugin and an AI-powered Observability Agent that investigates incidents via natural language — see the dedicated [Observability Agent project](#observability-agent) below for the full technical deep-dive
 
 - **Result: Production-ready agentic RAG platform completed by end of 2025, with pilot usage and planned rollout across 12 teams (400+ engineers). Reduced spec search time from 2 hours to 20 minutes per query. User dissatisfaction improved from 50% to 30% after 3 months of feedback-driven iteration. Custom web frontend replaced Google Chat with rich diagram rendering, multi-session management, and knowledge base browsing — architected as an extensible agentic platform for future use cases (KPI dashboards, configuration management, proactive RCA)**
 
@@ -386,10 +387,10 @@ order: 2
 
 ## AI-Powered Observability Agent for the LGTM Stack {#observability-agent}
 
-### The Situation — why I built it
-- The agentic copilot serving 400+ engineers was instrumented with Langfuse, but production debugging still required manually searching Tempo traces, writing LogQL queries in Loki, cross-referencing Grafana dashboards, and piecing together the story across multiple tabs — 10-15 minutes per investigation for an experienced developer
-- No existing tool could correlate signals across all three observability backends (traces, logs, metrics) through natural language — developers needed to know PromQL, LogQL, and TraceQL to investigate incidents
-- Goal: build an AI agent that lets developers investigate production incidents through conversation, autonomously querying the LGTM stack and correlating evidence across backends — and measure its quality rigorously with an eval framework
+### The Situation — why I built it (and why Langfuse wasn't enough)
+- The agentic copilot serving 400+ engineers had gone through two observability iterations: first custom OTel instrumentation, then Langfuse (which added unified tracing, prompt management, and evaluation). Langfuse was great for prompt iteration and eval, but production debugging still required manually searching Tempo traces, writing LogQL queries in Loki, cross-referencing Grafana dashboards, and piecing together the story across multiple tabs — 10-15 minutes per investigation for an experienced developer
+- Langfuse's limitations at production scale: no cross-signal correlation (couldn't connect a slow trace to the logs explaining why, or the metrics showing system load), no natural-language investigation (developers still needed PromQL/LogQL/TraceQL expertise), and no autonomous investigation (every query was manual)
+- Goal: build the third iteration of observability — self-host the LGTM stack for full backend access, then build an AI agent that lets developers investigate production incidents through conversation, autonomously querying and correlating evidence across all three backends. Built rapidly using AI-assisted development (Claude Code) with eval-driven iteration
 
 ### What I Did
 

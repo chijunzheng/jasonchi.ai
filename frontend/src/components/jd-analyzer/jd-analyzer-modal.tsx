@@ -26,6 +26,20 @@ type JDAnalysisResponse = JDAnalysis & { _jobDescription?: string }
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 const ACCEPTED_EXTENSIONS = new Set(['pdf', 'docx', 'txt', 'md'])
 const ACCEPTED_FILE_TYPES = '.pdf,.docx,.txt,.md'
+const SAMPLE_JD_TEXT = `Senior AI Engineer (Applied AI Platforms)
+
+We are hiring an AI Engineer to build production-grade agentic and retrieval systems for enterprise teams.
+
+Requirements:
+- 3+ years building LLM, RAG, or agent workflows in production
+- Strong Python or TypeScript backend engineering
+- Experience with cloud platforms (GCP or AWS), observability, and CI/CD
+- Comfortable translating ambiguous business needs into scalable technical systems
+
+Nice to have:
+- Data pipelines, BigQuery or Spark
+- Experience shipping internal AI copilots
+`
 
 function getFileExtension(filename: string): string {
   const parts = filename.toLowerCase().split('.')
@@ -166,6 +180,12 @@ export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModa
     setIsDragging(false)
   }
 
+  const handleLoadSample = () => {
+    setJdText(SAMPLE_JD_TEXT)
+    setJdFile(null)
+    setError(null)
+  }
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
       setOpen(isOpen)
@@ -177,7 +197,7 @@ export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModa
           <DialogTitle>Job Description Analyzer</DialogTitle>
           <DialogDescription>
             {state === 'input' &&
-              'Paste a JD or upload a file to get an instant match analysis.'}
+              'Start here: paste a JD or upload a file to get instant role-fit analysis and a tailored resume download.'}
             {state === 'analyzing' && 'Analyzing your match...'}
             {state === 'results' && 'Here\'s your match analysis'}
             {state === 'error' && 'Something went wrong'}
@@ -263,6 +283,13 @@ export function JDAnalyzerModal({ children, onAnalysisComplete }: JDAnalyzerModa
             <p className="text-xs text-muted-foreground">
               Tip: If both a file and pasted text are provided, the pasted text is used when it has enough detail.
             </p>
+            <button
+              type="button"
+              onClick={handleLoadSample}
+              className="w-fit text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Try sample JD
+            </button>
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}

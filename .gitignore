@@ -43,3 +43,6 @@ coverage/
 
 # Misc
 .turbo/
+
+# Resumes (private — not for public repo)
+resumes/
