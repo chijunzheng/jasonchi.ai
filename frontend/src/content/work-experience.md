@@ -179,7 +179,8 @@ order: 1
 - Key finding: separation of evidence gathering from synthesis broke the "budget ceiling" — V2's single agent exhausted its 6-call budget on tool calls 62% of the time, falling back to template answers; V3's dedicated investigator (25 iterations) and dedicated synthesizer eliminated template fallback entirely, driving answer quality from 0.638 to 0.833 (+30.8%)
 - Ablation study on the full benchmark proved intent classification as the keystone agent (removing it drops composite by −0.328), planner discovery as real value (−0.118 without it), and synthesizer separation as a structural improvement (−0.017)
 - Reduced incident investigation time from 10-15 minutes of manual dashboard-switching to under 30 seconds via natural language
-- Pre-provisioned Grafana with 12 dashboards: request overview, LLM metrics, token cost tracking, error rates, trace exploration, log exploration, retrieval metrics, and eval results
+- Pre-provisioned Grafana with 13 dashboards: request overview, LLM metrics, token cost tracking, error rates, trace exploration, log exploration, retrieval metrics, eval results with baseline comparison, and user feedback analytics
+- Designed the metrics not just for system observability but as engineering KPIs that measure how the team builds, tests, and ships AI software: cycle time (P50/P95/P99 request latency), rework (eval score regressions triggering re-investigation), defect trends (error rates by type over time), test health (eval composite score trending across deployments), and AI adoption (token usage and cost tracking showing which agents and models are actually being used). These dashboards serve both the development team for daily operations and leadership for understanding AI investment ROI
 - Automated the entire LGTM deployment via a single idempotent script: GCS bucket creation, firewall rules, VM provisioning with startup script, Cloud Run env var updates with internal IP, and IAP-protected HTTPS load balancer setup
 - The observability agent is self-observable: it exports its own telemetry back into the LGTM stack, so you can trace the agent investigating its own traces
 
@@ -198,6 +199,15 @@ order: 1
 - Built custom agent skills (reusable prompt templates for plan generation, feature decomposition, and code review) that encode project context and coding standards — treating the agent's context as an engineering artifact
 - This workflow was a significant factor in the project's velocity: building a production-ready agentic RAG platform with a team of 4 juniors within a year, while maintaining evaluation coverage and code quality
 - The meta-insight: the same agentic orchestration principles I apply to production AI systems (tool use, context management, parallel execution) also describe how I use AI coding tools — the skills are transferable in both directions
+
+#### AI-First SDLC: A Structured Workflow for AI-Native Teams
+- Formalized the team's AI-assisted development into a structured SDLC with measurable quality gates at each stage:
+  - **Planning:** Collaborative whiteboarding in team meetings + AI-generated architecture proposals — the team debates design trade-offs while AI drafts implementation plans and dependency graphs
+  - **Implementation:** AI-driven code generation (Claude Code, Cursor) with human oversight — engineers focus on design decisions and domain logic while AI handles boilerplate, scaffolding, and repetitive patterns
+  - **Code Review:** AI-assisted review on every PR before human approval — AI catches style violations, potential bugs, and consistency issues, freeing human reviewers to focus on architectural and business logic concerns
+  - **Testing & Quality:** LLM-as-judge evaluation framework (50-question benchmark, 6 scoring dimensions) replaces traditional QA for AI agent output — the eval suite runs automatically and scores against reference answers
+  - **Release:** Eval-gated deployment — we ship only when the composite benchmark score improves over the previous baseline. This is the AI-native equivalent of "deploy only when test coverage exceeds threshold." The 4-dimension automated eval pipeline (fact judge, retrieval judge, tool-call judge, performance judge) runs on every Cloud Run deployment, and results are diffable against previous versions to catch regressions
+- This workflow enabled a team of 4 junior engineers to ship production-quality AI systems at a pace that would normally require a much larger or more senior team — because quality gates are automated and measurable, not dependent on senior engineer availability for every review
 
 ### The Result
 - Improved ORAN benchmark accuracy from 62% (raw LLM) to 88% — a 42% relative improvement — through fine-tuned embeddings (+3%), hybrid retrieval (+5%), fine-tuned generator LLM (+2%), and contextual chunking (+5%)
