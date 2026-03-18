@@ -22,9 +22,14 @@ order: 4
 
 #### Thesis Results: Near-SOTA Accuracy at 20x Lower Compute
 - At CR=32 indoor: SandGlassNet achieved −11.33 dB NMSE with only 284M FLOPs vs. SwinCFNet's −11.65 dB at 5,495M FLOPs — similar accuracy at ~20× lower compute
-- Ablation studies validated each architectural choice: positional encoding improved convergence and final NMSE; transformer blocks captured global CSI correlations that pure convolutions missed; hierarchical encoder-decoder depth was tuned for optimal accuracy/compute balance
-- Metrics: MSE (training), NMSE and NMSE(dB) via FFT-domain comparison, rho (correlation) — standard wireless channel reconstruction metrics
-- Baseline replication of CsiNet 2018 confirmed directional consistency before proposing improvements
+- At CR=4 indoor (headline result): SandGlassNet achieved −29.70 dB NMSE — a 71% improvement over CsiNet's −17.36 dB, and competitive with TransNet's −32.38 dB
+- SandGlassNet outperformed CsiNet across ALL compression ratios and ALL scenarios (indoor and outdoor)
+- SandGlassNet achieved comparable performance to SwinCFNet with approximately 60% fewer parameters (2.24M vs. 7.38M at CR=4), demonstrating superior parameter efficiency
+- Architectural trade-off vs. TransNet: TransNet wins at low compression ratios (1/4, 1/8) due to its efficient full-attention tokenization strategy, but SandGlassNet wins at higher compression ratios (1/16, 1/32, 1/64) where hierarchical multi-stage processing preserves spatial consistency through severe compression
+- Ablation studies validated each architectural choice: transformer blocks were the keystone component (removing them collapsed performance to CNN-level); positional encoding had minimal impact on final NMSE (unlike NLP, suggesting convolution captures sufficient spatial structure); hierarchical S1/S2 scaling was more effective than adding transformer depth
+- Metrics: MSE (training), NMSE and NMSE(dB) via FFT-domain comparison, rho (spectral correlation) — standard wireless channel reconstruction metrics
+- NMSE-per-million-parameters efficiency: SandGlassNet scored 13.26 at CR=4 indoor — highest among all compared models
+- Baseline replication of CsiNet 2018 in PyTorch closely matched or exceeded the original TensorFlow implementation in most settings, validating our experimental setup
 
 #### Training Pipeline & Experiment Infrastructure
 - Built full PyTorch training pipeline: CLI-driven configuration, Adam optimizer with MSE loss, automatic checkpointing by validation loss, TensorBoard logging, optional Weights & Biases integration
@@ -32,10 +37,29 @@ order: 4
 - Tested across indoor/outdoor scenarios at 4 compression ratios — systematic grid of experiments, not just cherry-picked configurations
 - Compared CsiNet, TransNet, SwinCFNet, and SandGlassNet variants with consistent evaluation protocol
 
+#### Full Results Table: NMSE (dB) Across All Models and Compression Ratios
+| Scenario | CR   | CsiNet  | SandGlassNet | TransNet | SwinCFNet |
+|----------|------|---------|--------------|----------|-----------|
+| Indoor   | 1/4  | -17.36  | **-29.70**   | -32.38   | -28.94    |
+| Indoor   | 1/8  | -12.70  | **-17.01**   | -19.34   | -21.37    |
+| Indoor   | 1/16 | -7.61   | **-15.18**   | -15.00   | -15.90    |
+| Indoor   | 1/32 | -6.24   | **-11.33**   | -10.49   | -12.39    |
+| Indoor   | 1/64 | -5.84   | **-8.56**    | -8.30    | -9.66     |
+| Outdoor  | 1/4  | -8.75   | **-12.63**   | -14.86   | -12.22    |
+| Outdoor  | 1/16 | -4.51   | **-6.89**    | -7.62    | -7.62     |
+| Outdoor  | 1/32 | -2.81   | **-4.94**    | -4.43    | -4.73     |
+| Outdoor  | 1/64 | -1.93   | **-3.65**    | -2.62    | -3.66     |
+
+#### Compared Architectures Context
+- **CsiNet (Wen et al., 2018):** The pioneering CNN-based autoencoder for CSI feedback. Uses convolutional layers + RefineNet residual blocks. Established the benchmark on COST2100 dataset. Key limitation: cannot capture long-range dependencies — convolutions only see local receptive fields.
+- **TransNet (Cui et al., 2022):** State-of-the-art full-attention architecture with efficient tokenization (64 tokens × 32 features), asymmetric encoder-decoder design (simpler encoder at UE, deeper decoder at base station), and low FLOPs (32.72M at CR=4). Excels at low compression ratios.
+- **SwinCFNet (Cheng et al., 2024):** Uses Swin Transformer with shifted-window self-attention for computational efficiency. Strong performance but at significantly higher parameter cost (7.38M at CR=4 vs. SandGlassNet's 2.24M).
+
 ### The Result
 - Graduated with Merit
 - SandGlassNet: best performance-per-FLOP ratio among all compared models — competitive NMSE at dramatically lower compute cost
-- Three ablation studies (positional encoding, transformer blocks, hierarchical structure) each demonstrated measurable accuracy improvements, justifying every architectural component
+- Outperformed CsiNet across every configuration; competitive with or outperformed TransNet at higher compression ratios; matched SwinCFNet with 60% fewer parameters
+- Three ablation studies: transformer blocks (keystone — removing collapses to CNN-level), positional encoding (minimal impact for CSI, unlike NLP), hierarchical S1/S2 scaling (more effective than adding transformer depth)
 - Built a production-style ML experiment pipeline with checkpointing, logging, and reproducible configurations
 - Research directly informed my approach to evaluation-driven AI development at Telus — the ablation methodology carried over to RAG system optimization
 
