@@ -234,7 +234,7 @@ export function ChatMain({
             disabled={isLoading}
           />
         ) : (
-          <div className="mx-auto max-w-2xl space-y-4">
+          <div className="mx-auto max-w-4xl space-y-4">
             {messages.map((message, index) => (
               <div key={message.id} className="space-y-1">
                 <ChatMessage
@@ -276,14 +276,14 @@ export function ChatMain({
 
       {/* Session Summary */}
       {messages.length > 0 && (
-        <div className="mx-auto w-full max-w-2xl px-4">
+        <div className="mx-auto w-full max-w-4xl px-4">
           <SessionSummary messages={messages} />
         </div>
       )}
 
       {/* Chat input */}
       <div className="border-t p-4">
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto max-w-4xl">
           <ChatInput onSend={onSend} disabled={isLoading} />
           <p className="mt-2 text-center text-[10px] text-muted-foreground">
             Powered by Gemini + LangGraph

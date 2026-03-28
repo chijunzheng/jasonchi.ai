@@ -10,7 +10,7 @@ order: 3
 python, google ADK(agent development kit)
 
 ### Experienced
-numpy, pandas, google vertex AI discovery engine api, google vertex AI generative models api, langfuse, langgraph
+numpy, pandas, google vertex AI discovery engine api, google vertex AI generative models api, langfuse, langgraph, pydanticAI
 
 ### Familiar
 pytorch, langchain, llamaindex
