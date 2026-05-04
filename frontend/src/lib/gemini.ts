@@ -23,7 +23,7 @@ export async function* streamChat(
 ): AsyncGenerator<string> {
   const client = createClient()
   const model = client.getGenerativeModel({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     systemInstruction: systemPrompt,
   })
 

@@ -145,6 +145,78 @@ order: 2
 
 ---
 
+## Personal Assistant — A Second Brain I Talk To Anywhere (GitHub: [chijunzheng/personal-assistant](https://github.com/chijunzheng/personal-assistant))
+
+### The Situation — why I built it
+- I take fragmented notes everywhere — phone, laptop, paper, voice memos — but lose them the moment I need them. Existing second-brain tools (Notion, Obsidian alone) require me to remember where I put things and re-context every time I open them
+- Wanted an AI assistant I could talk to from anywhere, that reads and writes to a single source-of-truth memory, and that I never have to explicitly "search" — I just ask and it figures out where to look
+- Also a deliberate experiment: prove that meticulous context engineering can match or beat a vanilla agentic RAG baseline at lower token cost — without embeddings, without a vector database, just filesystem tools and structural conventions
+
+### What I Did
+
+#### Anywhere-Access Frontend via Telegram + Obsidian
+- Telegram is the input surface — I message the bot from my phone, laptop, or watch, anywhere with internet, and it routes to the agent
+- Obsidian vault on Google Drive is the visualization surface and source of truth — every note, every audit log, every domain entry lives as plain markdown or JSONL on disk. I can browse, edit, or graph-walk the same data the agent sees
+- This split (Telegram for write, Obsidian for read) mirrors the natural way I already work: capture on the go, review at the desk
+
+#### Built on Claude Code Headless to Bypass Per-Token Cost
+- The agent runs on `claude -p` (Claude Code headless mode) instead of the raw Anthropic API — this taps the Max plan's flat-rate quota instead of paying per token, making heavy daily use economically viable
+- Claude Code already ships Read/Grep/Glob/Bash as first-class tools, so the kernel didn't have to reinvent filesystem primitives — the agent uses the same tools a developer uses
+- Each turn is a fresh `claude -p` invocation with the kernel's system prompt, classifier output, and retrieved context piped in via stdin — stateless by design, with all state living in the vault
+
+#### No RAG, No Embeddings, No Vector DB — Pure Context Engineering
+- The portfolio thesis: meticulous context management beats vanilla agentic retrieval at less token cost. Eight engineering decisions (toggleable in `configs/default.yaml` vs. `configs/baseline.yaml`) deliver the win:
+  - **Tiered retrieval** — ordered tool palette (index → session → targeted reads) instead of grep-everywhere
+  - **Per-domain shaping** — structured query tools per domain (`query_finance`, `query_inventory`)
+  - **Recency weighting** — date-prefixed filenames (`2026-04-29-*.md`) make "last week" a free filesystem operation
+  - **Active session summary** — compact running summary across turns, never re-derived
+  - **Vault index first** — `INDEX.md` seeds the LLM's keyword expansion vocabulary before any grep
+  - **Backlink expansion** — 1-hop graph walk from retrieved notes via `[[wikilinks]]`
+  - **Suggested actions** — LLM pass over digests adds advice, not just data
+  - **Conflict auto-merge** — LLM-merge of Drive sync conflicts vs. stage-only
+- Semantic understanding lives in the LLM at *query time* via keyword expansion → grep → read → reason, instead of in a precomputed vector store. Trade ~6-8 tool calls per query for zero infra and zero embedding drift
+
+#### Kernel + Plugins Architecture
+- Hard architectural seam: a `kernel/` that never changes when adding features, and `domains/` plugins for each new use case (journal, finance, inventory, future)
+- Adding a new domain = `mkdir domains/<name>/` + `domain.yaml` + `prompt.md` + `handler.py` + 5 eval cases. Classifier auto-discovers intents from YAML; orchestrator dispatches via the registry; eval harness auto-discovers per-domain cases
+- This is the same multi-agent platform discipline I apply at work: keep the orchestration core stable, push variation to the plugins
+
+#### Eval Harness with Engineered vs. Baseline Head-to-Head
+- Two configs: `configs/default.yaml` (all eight engineering decisions ON) vs. `configs/baseline.yaml` (all OFF, vanilla agentic baseline)
+- Head-to-head eval on ~20-30 real interactions per domain, scored on five dimensions: accuracy, grounding, conciseness, connection, trust
+- Secondary axis: token budget per turn — the engineered system claim is "equal-or-better quality at lower context cost"
+- Every kernel change must run eval against both configs and not regress on existing domains. No eval, no promotion of a new domain
+
+#### Concurrency & Drive Sync Discipline
+- Atomic writes only — every vault write goes through `kernel/vault.py:atomic_write` (tmp + `os.replace`) to survive Drive Desktop racing the agent for the same file
+- Event logs are append-only with sha256 IDs — readers dedupe by ID, so the same event written twice produces the same row
+- 30-min user-edit buffer — before modifying any narrative `.md` file, check mtime; if I edited it recently, the agent stages to pending instead of overwriting
+- Audit log every write — no vault mutation without a corresponding entry in `vault/_audit/` for replay and forensics
+
+### The Result
+- Personal AI that I genuinely use daily — capture journal entries from Telegram on the bus, review them in Obsidian at the desk, ask financial questions across my own logs without re-reading them
+- Three live domain plugins (journal, finance, inventory) with the kernel never modified to add them — proof the plugin model holds
+- Eval matrix demonstrates each engineering decision's individual contribution against the baseline — engineered config wins on quality at lower token budget
+- Zero embedding infrastructure — no vector DB to deploy, no re-embedding job to maintain, no version skew between vault and index
+- Pattern proven: structural retrieval (filenames, folders, frontmatter, wikilinks) beats expensive semantic retrieval when the structure is already there
+
+### Real Talk
+- **Headless `claude -p` is a cheat code for personal projects.** Per-token API costs would make heavy daily use of an agent uneconomical for a single user. Routing through the Max plan's flat-rate quota collapses the unit economics — same model, same tools, predictable monthly cost
+- **Pure agentic retrieval is not a panacea.** It works because my vault is small (low thousands of files) and high-novelty (most queries are recent). For a 100K-document corpus or read-heavy traffic, RAG amortizes better. The architecture choice is workload-specific
+- **The hardest part wasn't the retrieval — it was the concurrency.** Drive Desktop, the agent, and me all want to write the same files. Five layered defenses (atomic writes, append-only logs, mtime buffers, audit-before-write, single-machine assumption) are the only reason the vault doesn't corrupt itself
+- **Kernel/plugin discipline is what made it survive feature creep.** Every new use case wants to creep into the kernel ("just one if statement..."). The CLAUDE.md cardinal rule — *kernel never changes to add a use case* — is enforced by the eval harness and saves me from myself
+
+### Tech I Used
+- **Agent runtime:** Claude Code headless (`claude -p`), Anthropic Max plan quota
+- **Input/output:** Telegram Bot API, Obsidian, Google Drive Desktop sync
+- **Storage:** Plain markdown + JSONL on the filesystem; no database
+- **Retrieval:** Filesystem tools (Read, Grep, Glob, Bash), `INDEX.md` keyword expansion, recency weighting, backlink graph walk
+- **Eval:** Custom head-to-head harness (engineered vs. baseline), 5-dimension scoring, per-domain cases
+- **Concurrency:** Atomic writes (`os.replace`), sha256-keyed append-only event logs, mtime-based user-edit buffer
+- **Tools:** Python, YAML configs, Git, GitHub Issues for execution queue
+
+---
+
 ## jasonchi.ai — AI-Powered Portfolio with Reflective Agentic RAG (GitHub: [chijunzheng/jasonchi.ai](https://github.com/chijunzheng/jasonchi.ai))
 
 ### The Situation — why I built it
@@ -496,6 +568,99 @@ order: 2
 - **Evaluation:** LLM-as-judge (Gemini), 50-question curated benchmark, 6-dimension scoring, ablation study framework
 - **Backend:** Python, FastAPI, asyncio, aiohttp
 - **Tools:** Docker, Git, GitHub, uv, Claude Code
+
+---
+
+## Investigate CLI — AI-Powered Incident Investigation Agent for the LGTM Stack (GitHub: [chijunzheng/investigate-cli](https://github.com/chijunzheng/investigate-cli)) {#investigate-cli}
+
+### The Situation — why I built it
+- At Telus, I built an AI observability agent for our production LGTM stack using Google ADK and Gemini (see [Observability Agent above](#observability-agent)) — but the architecture was coupled to Google's ecosystem. Wanted to prove the core concept (an AI agent that investigates incidents by autonomously querying logs, metrics, and traces) could work with any LLM provider and any LGTM deployment
+- Production incident investigation still requires developers to manually write PromQL, LogQL, and TraceQL queries, switch between Grafana dashboards, and mentally correlate signals across backends — even with a self-hosted LGTM stack, the query barrier remains
+- Goal: build a portable, vendor-agnostic investigation agent with a CLI for rapid prototyping and a Grafana plugin for production use — then demonstrate through rigorous evaluation that each architectural improvement (prompt engineering, tool formatting, context management, model routing) produces measurable, isolated gains
+- No LangChain, CrewAI, or vector databases — raw OpenAI function-calling API + HTTP requests to LGTM backends. Deliberately minimal dependencies to prove the pattern, not the tooling
+- Uses the OpenTelemetry Demo (37 microservices) as the test environment with pre-seeded failure scenarios, enabling reproducible evaluation without access to production infrastructure
+
+### What I Did
+
+#### Agent Architecture: 4 Progressive Versions (Same Codebase, Feature Flags)
+- Single `agent.py` with boolean feature flags that toggle 4 architectural levels — V1 through V4 share the same core loop, enabling controlled A/B comparison via the eval framework
+- **V1 (Baseline):** 3-line system prompt, sequential tool execution, no topology awareness — establishes the floor for measuring every subsequent improvement
+- **V2 (SRE Methodology + Tool Improvements):** 60-line system prompt encoding a 5-step SRE investigation methodology (Scope → Parallel Sweep → Directed Investigation → Verify → Report) with structured diagnosis format and confidence calibration. Parallel tool execution via ThreadPoolExecutor, automatic service topology injection before first turn, tool metadata headers (row counts, truncation status, query echo), and error enrichment (suggests available metric names/labels when queries fail)
+- **V3 (Context Management):** Micro-compact context management inspired by Claude Code's `microCompact.ts` — keeps 5 most recent tool results in full, replaces older results with `[Cleared: tool_name(args) — see your summary above]`. The V2 system prompt's Rule 6 ("your written summary is what persists") is what makes this work: the LLM learns to summarize findings before raw data is cleared. Added query dedup cache to prevent re-executing identical queries
+- **V4 (Model Routing):** First LLM call (broad parallel sweep) uses gpt-4.1 (cheap, fast), all subsequent calls (directed investigation, verification, diagnosis) use gpt-5.4 (expensive, deep reasoning). Counterintuitively, gpt-4.1 produces better signal coverage on the sweep — it follows the methodology prompt literally (81% all-3-signals) instead of "optimizing" based on incomplete topology data like gpt-5.4 does (34%). Tokens -31% and latency -34% vs V1
+
+#### Three LGTM Query Tools + Service Discovery
+- `query_logs` (Loki): LogQL queries with configurable time range and limit, formatted output (last 5 entries per series), error enrichment suggests available labels when queries fail
+- `query_metrics` (Mimir): PromQL instant and range queries, formatted metric values, error enrichment suggests available metric names via `/api/v1/label/__name__/values`
+- `query_traces` (Tempo): TraceQL search mode (by service, duration, tags) and detail mode (full span tree with parent-child relationships for a given trace ID)
+- `list_services`: Aggregates service names across all three backends — returns per-service signal availability (metrics, traces, logs). Auto-called before first investigation turn in V2+ for topology awareness
+
+#### Grafana App Plugin (React + TypeScript)
+- Built a Grafana app plugin that embeds the investigation agent directly into Grafana — developers investigate incidents without leaving their dashboards
+- WebSocket connection to FastAPI backend for real-time streaming of agent reasoning, tool executions, and synthesized Grafana panels
+- `ChatSidebar.tsx`: chat interface with auto-scrolling, event-type rendering (reasoning, tool_start, tool_result, panel_add, done)
+- `InlinePanel.tsx`: dynamically renders Grafana `VizPanel` components for each tool result — time-series panels for PromQL metrics, log viewer for Loki results, table panels for Tempo traces. When the agent executes a query, the backend generates a `panel_add` event with the query, datasource UID, time range, and panel type — the plugin renders a live Grafana panel inline in the chat, so investigations produce visualizations, not just text
+
+#### Comprehensive Eval Framework (40 Scenarios, 3 Scoring Methods)
+- 40 benchmark scenarios: 32 single-turn (LLM-curated from real OpenTelemetry demo failure data) + 8 multi-turn conversations (17 scored turns)
+- **Hit detection:** Binary — did the agent correctly name the root cause service?
+- **LLM-as-judge:** Chain-of-thought scoring on 3 dimensions: RCA accuracy (1-5), evidence quality (1-5), reasoning quality (1-5)
+- **Trace metrics:** Objective measurements per investigation — tool call count, signals checked (logs/metrics/traces), cache hits, self-corrections, query failures
+- Eval runner supports cross-version comparison: `python eval.py --compare` generates side-by-side reports isolating the impact of each architectural change
+- Benchmarks curated via `curate_benchmarks.py` — LLM-generated from actual failure patterns in the OpenTelemetry demo, with ground truth root causes verified against flagd-triggered fault injection
+
+#### One-Click Deployment & Demo Infrastructure
+- `deploy-gcp.sh`: single idempotent script creates a GCE VM, uploads pre-seeded 1.6GB LGTM data (from OpenTelemetry demo's 37 microservices), starts all containers, and outputs a single URL for the Grafana plugin
+- Pre-seeded failure scenarios generated by `seed_failures.py`: toggles feature flags via flagd to inject 4 failure patterns (payment charge failure, product catalog error, Kafka consumer lag spike, ad service high CPU), recording start/end timestamps for reproducible investigation demos
+- CLI `demo <name>` command auto-sets the correct time window for any pre-seeded scenario — developers jump straight into investigating without configuring time ranges
+
+### The Result
+
+#### Single-Turn (32 balanced scenarios: 8 per failure type)
+| Metric | V1 | V2 | V3 | V4 |
+|--------|----|----|-----|-----|
+| Hit rate | 47% | 59% | 50% | **62%** |
+| Evidence quality (1-5) | 2.47 | 4.38 | 4.16 | **4.69** |
+| Reasoning quality (1-5) | 3.06 | 3.97 | 4.06 | **4.09** |
+| Tokens/scenario | 40,739 | 33,134 | 32,859 | **28,298** |
+| Latency | 224s | 185s | 184s | **147s** |
+| All 3 signals checked | 34% | 53% | 34% | **81%** |
+| Avg tool calls | 17.8 | 13.8 | 14.9 | **12.9** |
+
+- V1→V2 (prompt + tools): biggest quality lever — evidence nearly doubles (2.47→4.38), tokens -19%, latency -17%
+- V2→V3 (context management): minimal impact on single-turn — compaction doesn't fire on short investigations
+- V3→V4 (model routing): hit +12pp, tokens -14%, latency -20%, all-3-signals 34%→81%. Hard difficulty improved most: 3/8→5/8. Kafka (hardest failure type): 2/8→5/8
+- V1→V4 (cumulative): hit +15pp, evidence +2.22, tokens -31%, latency -34%
+
+#### Multi-Turn (8 scenarios, 17 scored turns)
+| Metric | V1 | V2 | V3 | V4 |
+|--------|----|----|-----|-----|
+| Hit rate | 59% | 53% | 76% | **82%** |
+| Evidence quality (1-5) | 2.65 | 3.00 | 3.88 | **4.35** |
+| Reasoning quality (1-5) | 3.76 | 3.82 | 4.47 | **4.59** |
+| Avg final tokens | 11,955 | 10,761 | 10,986 | **8,646** |
+| Compacted entries | 0 | 0 | 128 | **127** |
+
+- V2→V3 (context management): the critical differentiator for multi-turn — hit +23pp (53%→76%), compaction clears stale tool results so the model reasons better with less noise
+- V3→V4 (model routing): hit +6pp (76%→82%), evidence +0.47, final tokens -21% — cheaper model for sweep + expensive model for reasoning compounds with compaction
+- V1→V4 (cumulative): hit +23pp (59%→82%), evidence +1.70, final tokens -28%
+- V4 is the best version on both benchmarks: 62% single-turn hit with 28.3K tokens/147s latency, 82% multi-turn hit with 8.6K final tokens
+
+### Real Talk
+- **The eval framework was more valuable than any single architectural improvement.** Without 40 scored scenarios, I couldn't distinguish "this feels better" from "this measurably improves diagnosis." The V1→V2 evidence quality jump (2.53→4.25) only became visible through systematic measurement — in manual testing, both versions "seemed to work"
+- **Tool metadata headers were a surprisingly high-ROI change.** Prepending row counts, truncation status, and query echoes to tool results gave the LLM enough context to decide whether to dig deeper or move on — without this, the agent frequently re-queried the same data in different formats, wasting iterations
+- **Context management is the difference between single-turn and multi-turn capability.** V3's compaction has minimal impact on single-turn (short investigations don't accumulate enough stale data), but dominates multi-turn: 76% hit vs V2's 53%. V4 compounds this further to 82%. The micro-compact approach — keeping recent results in full, replacing old ones with stubs, trusting the LLM's written summaries — is what makes sustained investigation possible. This directly informed the context management strategy applied to the Telus production agent
+- **Model routing revealed a counterintuitive finding: the cheaper model outperforms the expensive one on structured execution tasks.** gpt-4.1 follows the SRE methodology prompt literally — checks all 3 signals in 81% of scenarios. gpt-5.4 reads the (incomplete) service topology, reasons that "only metrics are available," and skips logs and traces — checking all 3 in only 34%. The smarter model's "intelligence" becomes a liability when it second-guesses correct methodology based on incomplete context. General principle: match model capability to subtask type — high instruction-following fidelity for execution, deep reasoning for diagnosis
+- **No-framework was a deliberate architectural choice.** The agent loop is ~50 lines of Python — streaming OpenAI responses, dispatching tool calls, appending results. The complexity lives in the tool implementations and the system prompt, not the orchestration. Every framework I evaluated added abstraction without adding capability for this use case
+- **The Grafana plugin proved that investigation agents belong inside observability tools.** When the agent generates a PromQL query and the result renders as a live Grafana time-series panel inline in the chat, developers can visually verify the agent's reasoning — text-only investigation misses this, visualization is part of the diagnostic loop
+
+### Tech I Used
+- **Backend:** Python, FastAPI, Uvicorn, OpenAI SDK (function-calling API with streaming), requests, rich (terminal rendering)
+- **Frontend:** React 18, TypeScript, Grafana SDK (@grafana/data, @grafana/ui, @grafana/runtime, @grafana/scenes), webpack, swc
+- **Observability:** Loki (LogQL), Mimir (PromQL), Tempo (TraceQL), Grafana, OpenTelemetry Collector, OpenTelemetry Demo (37 microservices)
+- **Infrastructure:** Docker Compose, GCE, Caddy (reverse proxy), flagd (feature flag injection)
+- **Eval:** LLM-as-judge (chain-of-thought), hit detection, trace metrics, 40-scenario benchmark, cross-version comparison framework
+- **Tools:** Docker, Git, GitHub, Claude Code
 
 ---
 

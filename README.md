@@ -1,5 +1,7 @@
 # jasonchi.ai
 
+**Live:** https://jasonchi-ai-1040325685723.us-central1.run.app
+
 AI-native portfolio and recruiter copilot with:
 - `frontend/`: Next.js 16 chat-first portfolio UI
 - `backend/`: FastAPI + LangGraph retrieval and JD analysis API

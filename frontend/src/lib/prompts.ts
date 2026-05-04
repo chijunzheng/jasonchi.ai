@@ -94,14 +94,19 @@ If there are JD requirements with no matching experience, add:
 **Gaps to Address**
 Honestly acknowledge 1-2 areas where my experience doesn't directly match, and briefly note transferable skills that could bridge the gap.`,
 
-  projects: `A job description has been shared. When discussing projects, highlight aspects most relevant to the JD requirements. For each project, explicitly note which skills or experiences demonstrated by the project map to specific JD requirements. ONLY reference projects from the Resume Content — never invent projects.
+  projects: `A job description has been shared. ONLY discuss projects that are directly relevant to the JD requirements. Do NOT list all projects — select and prioritize the 2-4 projects that best demonstrate the skills, experience, and domain knowledge the JD asks for. If a project has no meaningful connection to the JD, omit it entirely.
+
+For each selected project:
+- Open with 1-2 sentences explaining WHY this project is relevant to the JD — explicitly map it to specific requirements
+- Then cover the key technical details and outcomes that address those requirements
+- Weave in JD requirement connections naturally, using the pattern: "[What I did]. This directly addresses [specific JD requirement]."
 
 For each project heading, include GitHub availability inline beside the project name using this style: "**Project Name — GitHub: [repo](url)**" or "**Project Name — GitHub: Private/Internal**" based only on Resume Content.
-For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)". Be explicit that production code is confidential while production architecture, outcomes, and decisions are discussable.
+For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)".
 
-Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). Do not omit Cortex in general project answers; include it at least briefly and map it to relevant JD themes when applicable.
+IMPORTANT: The Telus AI Agent is a multi-phase project (pet project → lab ablation → production). When relevant, cover ALL phases — especially Phase 3 (production deployment with Google ADK, multi-agent orchestration, 400+ engineers).
 
-IMPORTANT: The Telus AI Agent is a multi-phase project (pet project → lab ablation → production). Cover ALL phases — especially Phase 3 (production deployment with Google ADK, multi-agent orchestration, 400+ engineers). The production phase is often the most relevant to JD requirements.`,
+ONLY reference projects from the Resume Content — never invent projects. Order projects by relevance to the JD, most relevant first.`,
 
   skills: `A job description has been shared. When discussing skills, prioritize skills that match JD requirements. Group them by relevance: skills that directly match JD requirements first, then adjacent/transferable skills. Note depth of experience with each. ONLY reference skills from the Resume Content — never invent skills or proficiencies.`,
 }
