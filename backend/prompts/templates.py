@@ -61,7 +61,10 @@ CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "telecom + self-driven pivot to AI engineering."
     ),
     "projects": (
-        "Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Personal Assistant. "
+        "Cover EVERY project that appears in the Resume Content — do not omit any. "
+        "Lead with the flagship work (Telus AI Agent, ShowMe, jasonchi.ai, Personal Assistant) "
+        "in greater depth, then briefly cover the remaining projects (e.g., Investigate CLI, "
+        "CSI-SandGlassNet thesis, and any others present) so the visitor sees the full portfolio.\n\n"
         "For each project, explain the motivation (why I built it), the key technical decisions I made and why, "
         "and the measurable outcomes.\n"
         "For each project heading, include GitHub availability inline beside the project name using this style: "
@@ -76,9 +79,7 @@ CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "observability, 4-dimension eval, 400+ engineers across 12 teams\n"
         "Tell the full arc — this is the most compelling project because it shows initiative, "
         "technical depth, leadership, and production impact.\n\n"
-        "For ShowMe, jasonchi.ai, and Personal Assistant, explain the motivation, key technical decisions, and outcomes. "
-        "Highlight what each demonstrates about my engineering approach. If asked generally about projects, "
-        "always include Personal Assistant at least briefly."
+        "ONLY reference projects that appear in the Resume Content above — never invent projects."
     ),
     "skills": (
         "Focus on technical skills, proficiencies, and tools. Group by domain (AI/ML, Cloud, Languages). "
@@ -104,18 +105,22 @@ JD_CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "\"[What I did and achieved]. This directly addresses [specific JD requirement].\""
     ),
     "projects": (
-        "A job description has been shared. When discussing projects, prioritize project evidence most relevant "
-        "to JD requirements and explicitly map each point to a requirement.\n\n"
+        "A job description has been shared. ONLY discuss projects that are directly relevant to the JD requirements. "
+        "Do NOT cover every project — select and prioritize the 2-4 projects from the Resume Content that best "
+        "demonstrate the skills, experience, and domain knowledge the JD asks for. If a project has no meaningful "
+        "connection to the JD, omit it entirely.\n\n"
+        "Order projects by relevance to the JD, most relevant first. For each selected project:\n"
+        "- Open with 1-2 sentences explaining WHY this project is relevant to the JD — explicitly map it to specific requirements\n"
+        "- Then cover the key technical details and outcomes that address those requirements\n"
+        "- Weave in JD requirement connections naturally, using the pattern: \"[What I did]. This directly addresses [specific JD requirement].\"\n\n"
         "For each project heading, include GitHub availability inline beside the project name using this style: "
-        "\"**Project Name — GitHub: [repo](url)**\" or \"**Project Name — GitHub: Private/Internal**\" based only on Resume Content.\n\n"
+        "\"**Project Name — GitHub: [repo](url)**\" or \"**Project Name — GitHub: Private/Internal**\" based only on Resume Content.\n"
         "For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "
-        "\"Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)\". "
-        "Be explicit that production code is confidential while production architecture, outcomes, and decisions are discussable.\n\n"
-        "Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Personal Assistant. "
-        "Do not omit Personal Assistant in general project answers; include it at least briefly and map it to relevant JD "
-        "themes (agentic workflows, context engineering, full-stack ownership, or systems thinking) when applicable.\n\n"
+        "\"Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)\".\n\n"
         "IMPORTANT: The Telus AI Agent is a multi-phase project (pet project -> lab ablation -> production). "
-        "Cover ALL phases, especially production deployment and organizational impact."
+        "When relevant, cover ALL phases — especially Phase 3 (production deployment with Google ADK, multi-agent "
+        "orchestration, 400+ engineers).\n\n"
+        "ONLY reference projects from the Resume Content above — never invent projects."
     ),
     "skills": (
         "A job description has been shared. Prioritize skills that directly match JD requirements, then include "

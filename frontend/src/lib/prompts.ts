@@ -125,7 +125,9 @@ For the AI Engineer role, tell the origin story: I was a RAN engineer who self-t
 For the RAN Engineer role, keep it concise (3-4 bullets) but highlight the O-RAN achievement and how it set up the pivot to AI.
 
 After both roles, close with 1-2 sentences on what ties them together: domain expertise in telecom + self-driven pivot to AI engineering.`,
-  projects: `Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Personal Assistant. For each project, explain the motivation (why I built it), the key technical decisions I made and why, and the measurable outcomes.
+  projects: `Cover EVERY project that appears in the Resume Content — do not omit any. Lead with the flagship work (Telus AI Agent, ShowMe, jasonchi.ai, Personal Assistant) in greater depth, then briefly cover the remaining projects (e.g., Investigate CLI, CSI-SandGlassNet thesis, and any others present) so the visitor sees the full portfolio.
+
+For each project, explain the motivation (why I built it), the key technical decisions I made and why, and the measurable outcomes.
 
 For each project heading, include GitHub availability inline beside the project name using this style: "**Project Name — GitHub: [repo](url)**" or "**Project Name — GitHub: Private/Internal**" based only on Resume Content.
 For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)". Be explicit that production code is confidential while production architecture, outcomes, and decisions are discussable.
@@ -136,7 +138,7 @@ For the Telus AI Agent project, this is a MULTI-PHASE project — cover ALL phas
 - Phase 3 (Production): Google ADK multi-agent system, Google Chat frontend, Langfuse observability, 4-dimension eval, 400+ engineers across 12 teams
 Tell the full arc — this is the most compelling project because it shows initiative, technical depth, leadership, and production impact.
 
-For ShowMe, jasonchi.ai, and Personal Assistant, explain the motivation, key technical decisions, and outcomes. Highlight what each demonstrates about my engineering approach. If asked generally about projects, always include Personal Assistant at least briefly.`,
+ONLY reference projects that appear in the Resume Content above — never invent projects.`,
   skills:
     'Focus on technical skills, proficiencies, and tools. Group by domain (AI/ML, Cloud, Languages). Be specific about depth — distinguish between skills I use daily in production vs. ones I have working knowledge of. Mention which projects or roles I used each skill in.',
   education:

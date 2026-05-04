@@ -47,9 +47,61 @@ _DEFAULT_FOLLOW_UPS = [
 ]
 
 
-def _balanced_projects_context(content: str, max_chars: int) -> str:
-    """Keep representative project coverage under truncation budget."""
-    truncation_note = "\n\n[Context truncated for latency.]"
+_PROJECT_RANK_STOPWORDS = frozenset({
+    "the", "and", "for", "with", "this", "that", "from", "are", "was", "have",
+    "has", "you", "your", "our", "will", "can", "all", "any", "but", "not",
+    "into", "they", "their", "them", "these", "those", "what", "which", "who",
+    "when", "where", "why", "how", "about", "across", "after", "also", "must",
+    "should", "would", "could", "such", "more", "most", "very", "than", "then",
+    "well", "just", "like", "through", "while", "between", "during", "each",
+    "ability", "experience", "experiences", "skills", "work", "role", "job",
+    "team", "teams", "year", "years", "use", "using", "used", "build", "built",
+    "building", "make", "makes", "made", "etc", "including", "include",
+})
+
+
+def _project_relevance_weights(blocks: list[str], job_description: str) -> list[float]:
+    """Per-section weight for budget allocation.
+
+    No JD: equal weight. With JD: each section gets a base weight plus the count
+    of distinct JD terms appearing in the section text. Keeps every section
+    represented while skewing the budget toward JD-relevant ones.
+    """
+    n = len(blocks)
+    if n == 0:
+        return []
+    if not job_description.strip():
+        return [1.0] * n
+
+    jd_terms = {
+        token
+        for token in re.findall(r"[a-z][a-z0-9+\-.]{2,}", job_description.lower())
+        if token not in _PROJECT_RANK_STOPWORDS
+    }
+    if not jd_terms:
+        return [1.0] * n
+
+    weights: list[float] = []
+    for block in blocks:
+        block_terms = set(re.findall(r"[a-z][a-z0-9+\-.]{2,}", block.lower()))
+        overlap = len(block_terms & jd_terms)
+        weights.append(1.0 + overlap)
+    return weights
+
+
+def _balanced_projects_context(
+    content: str,
+    max_chars: int,
+    job_description: str = "",
+) -> str:
+    """Distribute char budget across ALL project sections.
+
+    Default (no JD): equal allocation per section so every project is represented.
+    With JD: rank sections by JD-keyword overlap and skew budget toward
+    higher-ranked sections, but every section keeps a floor allocation so the
+    LLM still knows the full project portfolio exists.
+    """
+    truncation_note = "\n\n[Section truncated for length.]"
 
     def _with_note(text: str) -> str:
         cutoff = max(0, max_chars - len(truncation_note))
@@ -70,29 +122,35 @@ def _balanced_projects_context(content: str, max_chars: int) -> str:
         title = block.splitlines()[0].lower() if block else ""
         sections.append((title, block))
 
-    priorities = ["telus ai agent", "showme", "jasonchi.ai", "personal assistant"]
-    selected: list[str] = []
-    for key in priorities:
-        for title, block in sections:
-            if key in title and block not in selected:
-                selected.append(block)
-                break
-
-    if not selected:
+    if not sections:
         return _with_note(content)
 
+    blocks = [block for _, block in sections]
     separator = "\n\n---\n\n"
-    available = max_chars - (len(separator) * (len(selected) - 1))
+    available = max_chars - (len(separator) * (len(blocks) - 1))
     if available <= 0:
         return _with_note(content)
 
-    per_section = max(500, available // len(selected))
+    floor = 400
+    floor_total = floor * len(blocks)
+    weights = _project_relevance_weights(blocks, job_description)
+
+    if available <= floor_total:
+        per_section = max(200, available // len(blocks))
+        allocations = [per_section] * len(blocks)
+    else:
+        flexible = available - floor_total
+        weight_sum = sum(weights) or 1.0
+        allocations = [
+            floor + int(flexible * (w / weight_sum)) for w in weights
+        ]
+
     parts: list[str] = []
-    for block in selected:
-        if len(block) <= per_section:
+    for block, allocated in zip(blocks, allocations, strict=False):
+        if len(block) <= allocated:
             parts.append(block)
         else:
-            parts.append(block[:per_section].rstrip() + "\n\n[Section truncated for latency.]")
+            parts.append(block[:allocated].rstrip() + truncation_note)
 
     merged = separator.join(parts)
     if len(merged) > max_chars:
@@ -169,7 +227,9 @@ async def _prepare_fast_path_context(state: GraphState) -> tuple[str, str]:
     max_chars = int(getattr(settings, "fast_path_max_context_chars", 0) or 0)
     if max_chars > 0 and len(resume_content) > max_chars:
         if state.category == "projects":
-            resume_content = _balanced_projects_context(resume_content, max_chars)
+            resume_content = _balanced_projects_context(
+                resume_content, max_chars, state.job_description or ""
+            )
             logger.info(
                 "Fast path project context balanced: category=%s chars=%d->%d",
                 state.category,
