@@ -61,7 +61,7 @@ CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "telecom + self-driven pivot to AI engineering."
     ),
     "projects": (
-        "Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). "
+        "Cover the 4 flagship projects in detail: Telus AI Agent, ShowMe, jasonchi.ai, and Personal Assistant. "
         "For each project, explain the motivation (why I built it), the key technical decisions I made and why, "
         "and the measurable outcomes.\n"
         "For each project heading, include GitHub availability inline beside the project name using this style: "
@@ -76,9 +76,9 @@ CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "observability, 4-dimension eval, 400+ engineers across 12 teams\n"
         "Tell the full arc — this is the most compelling project because it shows initiative, "
         "technical depth, leadership, and production impact.\n\n"
-        "For ShowMe, jasonchi.ai, and Cortex, explain the motivation, key technical decisions, and outcomes. "
+        "For ShowMe, jasonchi.ai, and Personal Assistant, explain the motivation, key technical decisions, and outcomes. "
         "Highlight what each demonstrates about my engineering approach. If asked generally about projects, "
-        "always include Cortex at least briefly."
+        "always include Personal Assistant at least briefly."
     ),
     "skills": (
         "Focus on technical skills, proficiencies, and tools. Group by domain (AI/ML, Cloud, Languages). "
@@ -111,9 +111,9 @@ JD_CATEGORY_INSTRUCTIONS: dict[str, str] = {
         "For Telus AI Agent specifically, ALWAYS show dual artifact labeling in the heading: "
         "\"Public POC repo: [ORAN_RAG](...) | Production repo: Internal TELUS (confidential/NDA)\". "
         "Be explicit that production code is confidential while production architecture, outcomes, and decisions are discussable.\n\n"
-        "Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Cortex (Second Brain). "
-        "Do not omit Cortex in general project answers; include it at least briefly and map it to relevant JD "
-        "themes (agentic workflows, automation, full-stack ownership, or systems thinking) when applicable.\n\n"
+        "Cover these 4 flagship projects: Telus AI Agent, ShowMe, jasonchi.ai, and Personal Assistant. "
+        "Do not omit Personal Assistant in general project answers; include it at least briefly and map it to relevant JD "
+        "themes (agentic workflows, context engineering, full-stack ownership, or systems thinking) when applicable.\n\n"
         "IMPORTANT: The Telus AI Agent is a multi-phase project (pet project -> lab ablation -> production). "
         "Cover ALL phases, especially production deployment and organizational impact."
     ),

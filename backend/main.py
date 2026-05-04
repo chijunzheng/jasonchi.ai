@@ -132,7 +132,8 @@ def _infer_category_from_message(message: str) -> str | None:
         key in normalized
         for key in (
             "showme",
-            "cortex",
+            "personal assistant",
+            "second brain",
             "hackathon",
             "project",
             "jasonchi.ai",

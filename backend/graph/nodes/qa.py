@@ -70,7 +70,7 @@ def _balanced_projects_context(content: str, max_chars: int) -> str:
         title = block.splitlines()[0].lower() if block else ""
         sections.append((title, block))
 
-    priorities = ["telus ai agent", "showme", "jasonchi.ai", "cortex"]
+    priorities = ["telus ai agent", "showme", "jasonchi.ai", "personal assistant"]
     selected: list[str] = []
     for key in priorities:
         for title, block in sections:
